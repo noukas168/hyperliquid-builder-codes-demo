@@ -1,6 +1,7 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import NetworkToggle from "./NetworkToggle";
 
 export default function Header() {
   return (
@@ -10,6 +11,7 @@ export default function Header() {
         <span className="text-xs text-hl-muted bg-hl-card px-2 py-0.5 rounded">Demo</span>
       </div>
       <div className="flex items-center gap-3">
+        <NetworkToggle />
         <ConnectButton.Custom>
           {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
             const ready = mounted;
