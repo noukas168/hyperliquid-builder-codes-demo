@@ -24,11 +24,8 @@ function ConnectHero() {
     <div className="flex-1 flex items-center justify-center px-4">
       <div className="text-center max-w-md space-y-6">
         <div className="space-y-3">
-          <h1 className="text-3xl font-bold">Builder Codes Demo</h1>
-          <p className="text-hl-muted">
-            Walk through the complete Hyperliquid builder code lifecycle: approve a builder, place
-            orders with builder fees, and revoke approval.
-          </p>
+          <h1 className="text-3xl font-bold">Basis</h1>
+          <p className="text-hl-muted">Non-custodial trading terminal on Hyperliquid.</p>
         </div>
 
         <div className="bg-hl-card border border-hl-border rounded-xl p-6 space-y-4">

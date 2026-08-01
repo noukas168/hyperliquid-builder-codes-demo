@@ -16,9 +16,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Hyperliquid Builder Codes Demo",
-  description:
-    "Interactive demo showing how to integrate builder codes on Hyperliquid — connect your wallet and try it live.",
+  title: "Basis — trading terminal on Hyperliquid",
+  description: "Non-custodial trading terminal on Hyperliquid.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
