@@ -1,4 +1,11 @@
-import { CHECK_LABELS, type CheckId, type SafetyCheck, unknownCheck } from "@/lib/safety-types";
+import {
+  CHECK_LABELS,
+  type CheckId,
+  figureCheck,
+  figureUnknown,
+  type SafetyCheck,
+  unknownCheck,
+} from "@/lib/safety-types";
 
 /**
  * GoPlus Token Security API. Verified live against chain 56:
@@ -278,14 +285,14 @@ function isLockedHolder(h: GoPlusHolder): boolean {
   return Boolean(h.address && BURN_ADDRESSES.has(h.address.toLowerCase()));
 }
 
+/**
+ * Figure row, not a verdict. How much of the listed liquidity is locked or
+ * burned. Whether a given figure is acceptable depends on the token's age
+ * and structure, which we cannot judge, so we report the number and stop.
+ */
 function mapLpLock(t: GoPlusToken): SafetyCheck {
   const lp = t.lp_holders;
-  if (!Array.isArray(lp) || lp.length === 0) {
-    return unknownCheck(
-      "lpLock",
-      "GoPlus did not report who holds this token's liquidity, so whether it can be withdrawn is unknown.",
-    );
-  }
+  if (!Array.isArray(lp) || lp.length === 0) return figureUnknown("lpLock");
 
   let locked = 0;
   let measured = 0;
@@ -296,92 +303,32 @@ function mapLpLock(t: GoPlusToken): SafetyCheck {
     if (isLockedHolder(h)) locked += p;
   }
 
-  if (measured === 0) {
-    return unknownCheck(
-      "lpLock",
-      "Liquidity holders were listed without usable share figures, so the locked amount could not be worked out.",
-    );
-  }
-
-  const evidence = `${pct(locked)} of the top liquidity holders' share is locked or burned`;
-
-  if (locked >= 0.95) {
-    return check(
-      "lpLock",
-      "PASS",
-      "Effectively all of the listed liquidity is locked or burned, so it cannot simply be pulled out from under the market.",
-      evidence,
-    );
-  }
-  if (locked >= 0.5) {
-    return check(
-      "lpLock",
-      "WARN",
-      `Only ${pct(locked)} of the listed liquidity is locked. The rest can be withdrawn at any time, which would leave you unable to sell at anything like the quoted price.`,
-      evidence,
-    );
-  }
-  return check(
-    "lpLock",
-    "FAIL",
-    `Most of this token's liquidity is not locked (${pct(locked)} locked). Whoever holds it can remove it whenever they choose, and the price would collapse.`,
-    evidence,
-  );
+  if (measured === 0) return figureUnknown("lpLock");
+  return figureCheck("lpLock", `Liquidity locked: ${pct(locked)}`);
 }
 
+/**
+ * Figure row, not a verdict. Combined share of the top holders GoPlus lists,
+ * with burn addresses excluded because that supply can never be sold.
+ */
 function mapHolderConcentration(t: GoPlusToken): SafetyCheck {
   const holders = t.holders;
   if (!Array.isArray(holders) || holders.length === 0) {
-    return unknownCheck(
-      "holderConcentration",
-      "GoPlus did not report this token's largest holders, so concentration is unknown.",
-    );
+    return figureUnknown("holderConcentration");
   }
 
-  // Burned and locked supply is not a concentration risk — nobody can sell it.
-  const live = holders.filter((h) => !isLockedHolder(h));
-  if (live.length === 0) {
-    return check(
-      "holderConcentration",
-      "PASS",
-      "Every large holding listed is either burned or locked, so no single wallet on this list can dump on the market.",
-    );
+  let total = 0;
+  let measured = false;
+  for (const h of holders) {
+    const p = fraction(h.percent);
+    if (p === undefined) continue;
+    measured = true;
+    if (h.address && BURN_ADDRESSES.has(h.address.toLowerCase())) continue;
+    total += p;
   }
 
-  const top = live.reduce((max, h) => Math.max(max, fraction(h.percent) ?? 0), 0);
-  if (top === 0) {
-    return unknownCheck(
-      "holderConcentration",
-      "Large holders were listed without usable share figures, so concentration could not be worked out.",
-    );
-  }
-
-  const evidence = `largest unlocked holder ${pct(top)}${
-    live.length < holders.length ? " (burned and locked holdings excluded)" : ""
-  }`;
-
-  if (top > 0.5) {
-    return check(
-      "holderConcentration",
-      "FAIL",
-      `A single wallet holds ${pct(top)} of the supply and is free to sell it. One decision by that holder can wipe out the price.`,
-      evidence,
-    );
-  }
-  if (top > 0.2) {
-    return check(
-      "holderConcentration",
-      "WARN",
-      `The largest wallet holds ${pct(top)} of the supply. A sale of that size would move the price sharply against you.`,
-      evidence,
-    );
-  }
-  return check(
-    "holderConcentration",
-    "PASS",
-    `No single listed wallet holds more than ${pct(0.2)} of the supply. Only the top holders are listed, so this is not a full picture.`,
-    evidence,
-  );
+  if (!measured) return figureUnknown("holderConcentration");
+  return figureCheck("holderConcentration", `Top 10 holders: ${pct(total)} (burn excluded)`);
 }
 
 // ─────────────────────────── Fetch + assemble ───────────────────────────

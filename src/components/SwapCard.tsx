@@ -542,8 +542,9 @@ export default function SwapCard() {
         </div>
       )}
 
-      {/* ── Safety checks: only for tokens Basis has not curated ── */}
-      {!isCurated(buyToken.address) && <SafetyPanel address={buyToken.address} />}
+      {/* ── Safety checks: always shown for the selected buy token. Not gated
+          on curation, on a quote, or on an amount being entered. ── */}
+      <SafetyPanel address={buyToken.address} />
 
       {/* ── Swap ── */}
       <button

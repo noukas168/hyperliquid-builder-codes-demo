@@ -1,17 +1,22 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import type { Address } from "viem";
 import { BNB_CHAIN } from "@/config/chains";
 import { checkHoneypot, checkMintAuthority, checkOwnership, checkTax } from "@/lib/safety";
 import {
+  CHECK_HELP,
   CHECK_LABELS,
   CHECK_ORDER,
   type CheckId,
   type CheckStatus,
+  FIGURE_PREFIX,
+  figureUnknown,
+  isFigureCheck,
+  missingCheck,
   type SafetyCheck,
   type SafetyResponse,
-  unknownCheck,
 } from "@/lib/safety-types";
 
 /**
@@ -40,6 +45,56 @@ const ONCHAIN_FALLBACK: Partial<Record<CheckId, (address: Address) => Promise<Sa
   ownership: checkOwnership,
 };
 
+/**
+ * Question-mark affordance. Opens on hover for a mouse, on tap for touch
+ * (pointerType is checked so a tap doesn't fire hover and immediately
+ * un-toggle), and on keyboard focus. Escape closes it.
+ */
+function HelpTip({ id }: { id: CheckId }) {
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const open = pinned || hovered;
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label={`What does “${CHECK_LABELS[id]}” mean?`}
+        aria-expanded={open}
+        onClick={() => setPinned((v) => !v)}
+        onPointerEnter={(e) => {
+          if (e.pointerType === "mouse") setHovered(true);
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") setHovered(false);
+        }}
+        onFocus={() => setHovered(true)}
+        onBlur={() => {
+          setHovered(false);
+          setPinned(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setPinned(false);
+            setHovered(false);
+          }
+        }}
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-hl-border text-[9px] font-bold text-hl-muted hover:border-hl-muted hover:text-white"
+      >
+        ?
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute top-5 left-0 z-20 w-60 rounded border border-hl-border bg-hl-card p-2 text-[11px] font-normal leading-snug text-hl-text shadow-lg"
+        >
+          {CHECK_HELP[id]}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function StatusDot({ status }: { status: CheckStatus }) {
   return (
     <span
@@ -50,13 +105,28 @@ function StatusDot({ status }: { status: CheckStatus }) {
   );
 }
 
+/** Bare figure: no dot, no colour, no status pill. */
+function FigureRowView({ check }: { check: SafetyCheck }) {
+  return (
+    <div className="flex items-center gap-1.5 py-1.5">
+      <span className="text-xs text-hl-text">{check.detail}</span>
+      <HelpTip id={check.id} />
+    </div>
+  );
+}
+
 function CheckRowView({ check }: { check: SafetyCheck }) {
+  if (check.kind === "figure") return <FigureRowView check={check} />;
+
   return (
     <div className="flex items-start gap-2 py-1.5">
       <StatusDot status={check.status} />
       <div className="flex min-w-0 flex-col">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-white">{check.label}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-white">{check.label}</span>
+            <HelpTip id={check.id} />
+          </span>
           <span
             className="text-[10px] font-semibold uppercase tracking-wide"
             style={{ color: STATUS_COLOR[check.status] }}
@@ -75,12 +145,23 @@ function CheckRowView({ check }: { check: SafetyCheck }) {
   );
 }
 
-function LoadingRow({ label }: { label: string }) {
+function LoadingRow({ id }: { id: CheckId }) {
+  if (isFigureCheck(id)) {
+    return (
+      <div className="flex items-center gap-1.5 py-1.5">
+        <span className="text-xs text-hl-muted">{FIGURE_PREFIX[id]}: checking…</span>
+        <HelpTip id={id} />
+      </div>
+    );
+  }
   return (
     <div className="flex items-start gap-2 py-1.5">
       <StatusDot status="UNKNOWN" />
       <div className="flex flex-col">
-        <span className="text-xs font-semibold text-white">{label}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-white">{CHECK_LABELS[id]}</span>
+          <HelpTip id={id} />
+        </span>
         <span className="text-[11px] text-hl-muted">Checking…</span>
       </div>
     </div>
@@ -88,8 +169,8 @@ function LoadingRow({ label }: { label: string }) {
 }
 
 /**
- * Fallback row: runs the on-chain check for this id, or renders UNKNOWN when
- * there is no on-chain equivalent. Each row loads independently.
+ * Fallback row: runs the on-chain check for this id, or renders the
+ * "no answer" row when there is no on-chain equivalent.
  */
 function FallbackRow({ address, id }: { address: Address; id: CheckId }) {
   const run = ONCHAIN_FALLBACK[id];
@@ -107,18 +188,18 @@ function FallbackRow({ address, id }: { address: Address; id: CheckId }) {
   if (!run) {
     return (
       <CheckRowView
-        check={unknownCheck(
+        check={missingCheck(
           id,
           "This check needs the security data service, which is unavailable right now. It cannot be answered from the chain alone.",
         )}
       />
     );
   }
-  if (isLoading) return <LoadingRow label={CHECK_LABELS[id]} />;
+  if (isLoading) return <LoadingRow id={id} />;
   if (isError || !data) {
     return (
       <CheckRowView
-        check={unknownCheck(
+        check={missingCheck(
           id,
           "This check could not be completed, so nothing is known either way.",
         )}
@@ -166,16 +247,17 @@ export default function SafetyPanel({ address }: { address: Address }) {
 
       <div className="flex flex-col divide-y divide-hl-border">
         {CHECK_ORDER.map((id) => {
-          if (isLoading) return <LoadingRow key={id} label={CHECK_LABELS[id]} />;
+          if (isLoading) return <LoadingRow key={id} id={id} />;
           if (goPlusFailed) return <FallbackRow key={id} address={address} id={id} />;
           const check = byId.get(id);
-          return check ? (
-            <CheckRowView key={id} check={check} />
+          if (check) return <CheckRowView key={id} check={check} />;
+          // A row the service did not answer is unknown, never a pass.
+          return isFigureCheck(id) ? (
+            <FigureRowView key={id} check={figureUnknown(id)} />
           ) : (
-            // A row the service simply did not answer is unknown, never a pass.
             <CheckRowView
               key={id}
-              check={unknownCheck(id, "This check was not returned for this token.")}
+              check={missingCheck(id, "This check was not returned for this token.")}
             />
           );
         })}
