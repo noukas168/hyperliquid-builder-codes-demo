@@ -110,7 +110,7 @@ function mapHoneypot(t: GoPlusToken): SafetyCheck {
     return check(
       "honeypot",
       "WARN",
-      "A sale simulated successfully, but this token stops you selling your whole balance — you will be left holding a portion you cannot exit.",
+      "A sale simulated successfully, but this token stops you selling your whole balance. You will be left holding a portion you cannot exit.",
       "cannot_sell_all = 1",
     );
   }
@@ -251,7 +251,7 @@ function mapOwnerPrivileges(t: GoPlusToken): SafetyCheck {
   return check(
     "ownerPrivileges",
     "PASS",
-    "None of the common owner powers — pausing trading, blacklisting wallets, rewriting balances or changing the tax — were found.",
+    "None of the common owner powers were found: pausing trading, blacklisting wallets, rewriting balances, or changing the tax.",
   );
 }
 

@@ -21,7 +21,7 @@ const SLIPPAGE_PRESETS = [50, 100, 300]; // bps → 0.5%, 1%, 3%
 const HIGH_SLIPPAGE_BPS = 500; // above 5% we shout
 const NATIVE_GAS_BUFFER = parseUnits("0.005", 18); // leave room for gas on MAX
 
-const UNVERIFIED_LABEL = "Unverified — Basis has not checked this token";
+const UNVERIFIED_LABEL = "Address not checked by Basis";
 
 function isCurated(address: string): boolean {
   return BNB_TOKENS.some((t) => t.address.toLowerCase() === address.toLowerCase());
@@ -95,7 +95,11 @@ function TokenPicker({ title, tokens, onSelect, onClose, onAddCustom }: TokenPic
       {filtered.length > 0 && (
         <div className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-wide text-hl-muted">
-            Verified · curated by Basis
+            Address checked by Basis
+          </span>
+          <span className="text-[10px] leading-snug text-hl-muted">
+            Basis has confirmed these contract addresses are the real ones for these tokens. That is
+            all this means. It is not a judgement about whether a token is safe or worth buying.
           </span>
           {filtered.map((t) => (
             <button
@@ -216,6 +220,7 @@ export default function SwapCard() {
     buyAmount,
     minBuyAmount,
     integratorFee,
+    zeroExFee,
     estimatedGas,
     priceImpact,
     sources,
@@ -309,6 +314,28 @@ export default function SwapCard() {
   };
 
   const fmt = (v?: string, d = 18) => (v ? Number(formatUnits(BigInt(v), d)).toFixed(6) : "—");
+
+  // Fee lines come straight from the live quote, never from a hardcoded rate.
+  // A fee can be denominated in either side of the trade, so resolve the fee
+  // token before formatting; if it resolves to neither, omit the line rather
+  // than print a number scaled by the wrong decimals.
+  const resolveFeeToken = (addr?: string): TokenInfo | null => {
+    if (!addr) return null;
+    const a = addr.toLowerCase();
+    if (a === sellToken.address.toLowerCase()) return sellToken;
+    if (a === buyToken.address.toLowerCase()) return buyToken;
+    return null;
+  };
+
+  const feeText = (fee: { amount?: string; token?: string } | null): string | null => {
+    if (!fee?.amount) return null;
+    const info = resolveFeeToken(fee.token);
+    if (!info) return null;
+    return `${fmt(fee.amount, info.decimals)} ${info.symbol}`;
+  };
+
+  const basisFeeText = feeText(integratorFee);
+  const zeroExFeeText = feeText(zeroExFee);
 
   const tokenButton = (side: "sell" | "buy", token: TokenInfo) => (
     <button
@@ -480,14 +507,18 @@ export default function SwapCard() {
               <dd className="font-mono text-white">{priceImpact}%</dd>
             </div>
           )}
-          <div className="flex justify-between">
-            <dt className="text-hl-muted">Basis fee</dt>
-            <dd className="text-right text-white">
-              {integratorFee
-                ? `${fmt(integratorFee.amount, sellToken.decimals)} ${sellToken.symbol} — taken from what you pay`
-                : "No fee on this trade"}
-            </dd>
-          </div>
+          {basisFeeText && (
+            <div className="flex justify-between">
+              <dt className="text-hl-muted">Basis fee</dt>
+              <dd className="text-right text-white">{basisFeeText}</dd>
+            </div>
+          )}
+          {zeroExFeeText && (
+            <div className="flex justify-between">
+              <dt className="text-hl-muted">0x protocol fee</dt>
+              <dd className="text-right text-white">{zeroExFeeText}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-hl-muted">Route</dt>
             <dd className="text-right text-white">{sources.length ? sources.join(" + ") : "—"}</dd>

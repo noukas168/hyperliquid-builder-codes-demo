@@ -67,7 +67,7 @@ export const CHECK_ORDER: CheckId[] = [
  */
 export const CHECK_HELP: Record<CheckId, string> = {
   honeypot:
-    "Whether a test sale actually went through — if it did not, you could put money in and never get it back out.",
+    "Whether a test sale actually went through. If it did not, you could put money in and never get it back out.",
   tax: "The share of every trade the token keeps for itself, which you lose both when you buy and when you sell.",
   mintAuthority:
     "Whether someone can still create new tokens out of thin air, which would make the ones you hold worth less.",

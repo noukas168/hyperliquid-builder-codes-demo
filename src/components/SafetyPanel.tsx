@@ -50,7 +50,7 @@ const ONCHAIN_FALLBACK: Partial<Record<CheckId, (address: Address) => Promise<Sa
  * (pointerType is checked so a tap doesn't fire hover and immediately
  * un-toggle), and on keyboard focus. Escape closes it.
  */
-function HelpTip({ id }: { id: CheckId }) {
+function HelpTip({ id, detail }: { id: CheckId; detail?: string }) {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
   const open = pinned || hovered;
@@ -88,11 +88,31 @@ function HelpTip({ id }: { id: CheckId }) {
           role="tooltip"
           className="absolute top-5 left-0 z-20 w-60 rounded border border-hl-border bg-hl-card p-2 text-[11px] font-normal leading-snug text-hl-text shadow-lg"
         >
-          {CHECK_HELP[id]}
+          <span className="block">{CHECK_HELP[id]}</span>
+          {detail && <span className="mt-1 block text-hl-muted">{detail}</span>}
         </span>
       )}
     </span>
   );
+}
+
+const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+
+/** Raw field value. Addresses link out rather than sitting there bare. */
+function EvidenceValue({ value }: { value: string }) {
+  if (ADDRESS_RE.test(value)) {
+    return (
+      <a
+        href={BNB_CHAIN.addressUrl(value)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-mono text-[10px] text-hl-muted underline hover:text-white"
+      >
+        {value.slice(0, 6)}…{value.slice(-4)} on BscScan
+      </a>
+    );
+  }
+  return <span className="break-all font-mono text-[10px] text-hl-muted">{value}</span>;
 }
 
 function StatusDot({ status }: { status: CheckStatus }) {
@@ -125,7 +145,7 @@ function CheckRowView({ check }: { check: SafetyCheck }) {
         <span className="flex flex-wrap items-center gap-2">
           <span className="flex items-center gap-1.5">
             <span className="text-xs font-semibold text-white">{check.label}</span>
-            <HelpTip id={check.id} />
+            <HelpTip id={check.id} detail={check.detail} />
           </span>
           <span
             className="text-[10px] font-semibold uppercase tracking-wide"
@@ -134,10 +154,9 @@ function CheckRowView({ check }: { check: SafetyCheck }) {
             {STATUS_WORD[check.status]}
           </span>
         </span>
-        <span className="text-[11px] leading-snug text-hl-text">{check.detail}</span>
         {check.evidence && (
-          <span className="mt-0.5 break-all font-mono text-[10px] text-hl-muted">
-            {check.evidence}
+          <span className="mt-0.5">
+            <EvidenceValue value={check.evidence} />
           </span>
         )}
       </div>
@@ -234,7 +253,7 @@ export default function SafetyPanel({ address }: { address: Address }) {
       <div className="flex flex-col gap-1 pb-1">
         <h3 className="text-sm font-semibold text-white">Safety checks</h3>
         <p className="text-[11px] leading-snug text-hl-muted">
-          Finding no red flag is not the same as finding it safe — a grey result means we could not
+          Finding no red flag is not the same as finding it safe. A grey result means we could not
           check, not that the token passed.
         </p>
         {goPlusFailed && (

@@ -89,7 +89,7 @@ export function checkOwnership(address: Address): Promise<SafetyCheck> {
             label: "Ownership",
             status: "PASS",
             detail:
-              "Ownership is renounced — owner() is the zero address, so owner-only functions can no longer be called. This does not rule out privileges built in elsewhere.",
+              "Ownership is renounced. The owner is the zero address, so owner-only functions can no longer be called. This does not rule out privileges built in elsewhere.",
             evidence: owner,
           },
         };

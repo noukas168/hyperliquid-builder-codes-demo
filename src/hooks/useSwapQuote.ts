@@ -81,6 +81,7 @@ export function useSwapQuote(args: {
     buyAmount: d?.buyAmount,
     minBuyAmount: d?.minBuyAmount,
     integratorFee: d?.fees?.integratorFee ?? null,
+    zeroExFee: d?.fees?.zeroExFee ?? null,
     estimatedGas: d?.gas,
     totalNetworkFee: d?.totalNetworkFee,
     priceImpact: d?.estimatedPriceImpact,
