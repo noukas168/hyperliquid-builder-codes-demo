@@ -101,14 +101,50 @@ const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 /**
  * Being throttled is not the same as the service being down, and the panel
  * must not conflate them: one clears itself in a moment, the other does not.
+ * `status` is carried so the retry policy can tell a transient failure from a
+ * settled answer.
  */
 class SafetyLookupError extends Error {
+  readonly status: number;
   readonly throttled: boolean;
-  constructor(message: string, throttled: boolean) {
+  constructor(message: string, status: number, throttled: boolean) {
     super(message);
     this.name = "SafetyLookupError";
+    this.status = status;
     this.throttled = throttled;
   }
+}
+
+const MAX_LOOKUP_RETRIES = 3;
+
+/**
+ * Retry only what can plausibly succeed on a second ask.
+ *
+ * 404 means GoPlus has no data for this token. That is a real answer — the
+ * token is unindexed — and asking again will return the same thing, so it must
+ * settle immediately rather than spin. Other 4xx are our own malformed request
+ * and will not fix themselves either. A 429 is the opposite: it says nothing
+ * about the token, only that we asked too often, so it is always worth
+ * retrying. 5xx and thrown network/parse errors are transient by nature.
+ */
+function shouldRetryLookup(failureCount: number, error: Error): boolean {
+  if (failureCount >= MAX_LOOKUP_RETRIES) return false;
+  if (error instanceof SafetyLookupError) {
+    if (error.throttled) return true;
+    return error.status >= 500;
+  }
+  // Not a SafetyLookupError: fetch itself threw, or the body would not parse.
+  return true;
+}
+
+/**
+ * A throttle needs real time to clear — measured against GoPlus, the window
+ * lasts tens of seconds — so it backs off harder than a network blip.
+ * Throttle: 5s, 10s, 20s. Everything else: 1s, 2s, 4s.
+ */
+function lookupRetryDelay(failureCount: number, error: Error): number {
+  const base = error instanceof SafetyLookupError && error.throttled ? 5_000 : 1_000;
+  return Math.min(base * 2 ** failureCount, 30_000);
 }
 
 /** Raw field value. Addresses link out rather than sitting there bare. */
@@ -256,13 +292,19 @@ export default function SafetyPanel({ address }: { address: Address }) {
       if (!res.ok) {
         throw new SafetyLookupError(
           json?.error ?? "Security lookup failed",
+          res.status,
           json?.throttled === true,
         );
       }
       return json as SafetyResponse;
     },
-    staleTime: Number.POSITIVE_INFINITY,
-    retry: false,
+    // A successful answer is backed by the server-side cache and never needs
+    // re-asking. A failed one must not be frozen in place: going stale lets it
+    // retry on remount or when the window regains focus, so a throttle that
+    // outlives the retries above still recovers without a page reload.
+    staleTime: (query) => (query.state.status === "error" ? 0 : Number.POSITIVE_INFINITY),
+    retry: shouldRetryLookup,
+    retryDelay: lookupRetryDelay,
   });
 
   const throttled = goPlusFailed && error?.throttled === true;

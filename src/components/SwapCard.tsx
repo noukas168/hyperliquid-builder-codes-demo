@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, useBalance } from "wagmi";
@@ -177,6 +178,7 @@ function TokenPicker({ title, tokens, onSelect, onClose, onAddCustom }: TokenPic
 
 export default function SwapCard() {
   const { address, isConnected, chainId } = useAccount();
+  const queryClient = useQueryClient();
   const [sellToken, setSellToken] = useState<TokenInfo>(DEFAULT_SELL_TOKEN);
   const [buyToken, setBuyToken] = useState<TokenInfo>(DEFAULT_BUY_TOKEN);
   const [amount, setAmount] = useState("");
@@ -199,13 +201,23 @@ export default function SwapCard() {
   };
 
   // One balance read that covers native and arbitrary ERC-20s alike.
-  const { data: balanceData } = useBalance({
+  const { data: balanceData, queryKey: sellBalanceKey } = useBalance({
     address,
     token: isNativeToken(sellToken.address) ? undefined : sellToken.address,
     chainId: BNB_CHAIN.chainId,
     query: { enabled: Boolean(address) },
   });
   const balance = balanceData?.value;
+
+  // Not displayed. Read so that the buy side has a cache entry to invalidate
+  // after a swap — otherwise flipping the pair straight after a trade shows
+  // the balance this token had *before* it.
+  const { queryKey: buyBalanceKey } = useBalance({
+    address,
+    token: isNativeToken(buyToken.address) ? undefined : buyToken.address,
+    chainId: BNB_CHAIN.chainId,
+    query: { enabled: Boolean(address) },
+  });
 
   const sellAmountBase = useMemo(() => {
     if (!amount || Number(amount) <= 0) return "0";
@@ -254,6 +266,17 @@ export default function SwapCard() {
   useEffect(() => {
     if (approvalConfirmed) refetch();
   }, [approvalConfirmed, refetch]);
+
+  /**
+   * A confirmed swap moves both sides, so both cached balances are stale the
+   * moment it lands. `status` becomes "success" only after the receipt is
+   * mined and checked for revert, so this fires once per completed swap.
+   */
+  useEffect(() => {
+    if (status !== "success") return;
+    queryClient.invalidateQueries({ queryKey: sellBalanceKey });
+    queryClient.invalidateQueries({ queryKey: buyBalanceKey });
+  }, [status, queryClient, sellBalanceKey, buyBalanceKey]);
 
   const needsApproval = Boolean(allowanceIssue) && !isNativeToken(sellToken.address);
   const busy =
