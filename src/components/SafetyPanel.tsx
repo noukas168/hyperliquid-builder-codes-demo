@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Address } from "viem";
 import { BNB_CHAIN } from "@/config/chains";
 import { checkHoneypot, checkMintAuthority, checkOwnership, checkTax } from "@/lib/safety";
@@ -277,23 +277,59 @@ function FallbackRow({ address, id }: { address: Address; id: CheckId }) {
   return <CheckRowView check={data} />;
 }
 
+/**
+ * How long a token must stay selected before we look it up. Clicking through
+ * the picker should not spend a GoPlus call on every token passed over — the
+ * unauthenticated limit is reached after roughly ten.
+ */
+const SELECTION_SETTLE_MS = 400;
+
 export default function SafetyPanel({ address }: { address: Address }) {
-  const {
-    data,
-    isLoading,
-    isError: goPlusFailed,
-    error,
-  } = useQuery<SafetyResponse, SafetyLookupError>({
-    queryKey: ["safety-goplus", address.toLowerCase()],
-    queryFn: async () => {
-      const qs = new URLSearchParams({ address, chainId: String(BNB_CHAIN.chainId) });
-      const res = await fetch(`/api/safety?${qs.toString()}`);
+  // The token actually being looked up. Trails `address` by the settle delay,
+  // so a token skipped past in under that never triggers a request at all.
+  const [settledAddress, setSettledAddress] = useState<Address>(address);
+  useEffect(() => {
+    const t = setTimeout(() => setSettledAddress(address), SELECTION_SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [address]);
+
+  // True while the selection is still settling. Counts as loading, so the
+  // panel never shows one token's verdict under another token's name.
+  const settling = settledAddress.toLowerCase() !== address.toLowerCase();
+
+  const { data, isLoading, isError, error } = useQuery<SafetyResponse, SafetyLookupError>({
+    queryKey: ["safety-goplus", settledAddress.toLowerCase()],
+    queryFn: async ({ signal }) => {
+      const qs = new URLSearchParams({
+        address: settledAddress,
+        chainId: String(BNB_CHAIN.chainId),
+      });
+      // `signal` is aborted by React Query as soon as this query is superseded
+      // or unmounted, so a switch away cancels the request in flight instead
+      // of letting it run on and spend rate limit for a token nobody is
+      // looking at any more.
+      const res = await fetch(`/api/safety?${qs.toString()}`, { signal });
       const json = await res.json();
       if (!res.ok) {
         throw new SafetyLookupError(
           json?.error ?? "Security lookup failed",
           res.status,
           json?.throttled === true,
+        );
+      }
+      // Belt and braces over the query key: the body must name the token that
+      // was asked for. A different address — or none at all — is rejected here
+      // so it can never reach the render path. Throwing rather than returning
+      // it matters: a payload that silently fails the render-time check would
+      // leave the panel pending for ever.
+      if (
+        typeof json?.address !== "string" ||
+        json.address.toLowerCase() !== settledAddress.toLowerCase()
+      ) {
+        throw new SafetyLookupError(
+          "Security lookup returned a different token",
+          res.status,
+          false,
         );
       }
       return json as SafetyResponse;
@@ -307,8 +343,15 @@ export default function SafetyPanel({ address }: { address: Address }) {
     retryDelay: lookupRetryDelay,
   });
 
+  // Only render a payload that names the token currently on screen. React
+  // Query keys per address, so this should already hold; asserting it makes a
+  // mismatch impossible to display rather than merely unlikely.
+  const current = data && data.address.toLowerCase() === address.toLowerCase() ? data : undefined;
+
+  const pending = settling || isLoading || (!current && !isError);
+  const goPlusFailed = !settling && isError;
   const throttled = goPlusFailed && error?.throttled === true;
-  const byId = new Map((data?.checks ?? []).map((c) => [c.id, c]));
+  const byId = new Map((current?.checks ?? []).map((c) => [c.id, c]));
 
   return (
     <section className="flex flex-col gap-1 rounded-md border border-hl-border bg-hl-bg p-3">
@@ -336,8 +379,8 @@ export default function SafetyPanel({ address }: { address: Address }) {
 
       <div className="flex flex-col divide-y divide-hl-border">
         {CHECK_ORDER.map((id) => {
-          if (isLoading) return <LoadingRow key={id} id={id} />;
-          if (goPlusFailed) return <FallbackRow key={id} address={address} id={id} />;
+          if (pending) return <LoadingRow key={id} id={id} />;
+          if (goPlusFailed) return <FallbackRow key={id} address={settledAddress} id={id} />;
           const check = byId.get(id);
           if (check) return <CheckRowView key={id} check={check} />;
           // A row the service did not answer is unknown, never a pass.
