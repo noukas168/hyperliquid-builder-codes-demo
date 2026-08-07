@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { Address } from "viem";
 import { BNB_CHAIN } from "@/config/chains";
@@ -284,7 +284,12 @@ function FallbackRow({ address, id }: { address: Address; id: CheckId }) {
  */
 const SELECTION_SETTLE_MS = 400;
 
+/** Single source of the key, so the cache probe below cannot drift from it. */
+const safetyQueryKey = (address: string) => ["safety-goplus", address.toLowerCase()] as const;
+
 export default function SafetyPanel({ address }: { address: Address }) {
+  const queryClient = useQueryClient();
+
   // The token actually being looked up. Trails `address` by the settle delay,
   // so a token skipped past in under that never triggers a request at all.
   const [settledAddress, setSettledAddress] = useState<Address>(address);
@@ -293,15 +298,31 @@ export default function SafetyPanel({ address }: { address: Address }) {
     return () => clearTimeout(t);
   }, [address]);
 
+  /**
+   * The settle delay exists only to avoid spending a network lookup on a token
+   * being skipped over. An answer already in the client cache costs nothing to
+   * show, so waiting would be delay for its own sake — switch back to a token
+   * seen a moment ago and its result should be there at once.
+   *
+   * Only a cached *success* qualifies. React Query stores no data for a failed
+   * query, so `getQueryData` returns undefined for one, and an error correctly
+   * goes back through the settle delay and the retry policy rather than
+   * short-circuiting to a stale verdict.
+   */
+  const hasCachedResult = Boolean(
+    queryClient.getQueryData<SafetyResponse>(safetyQueryKey(address)),
+  );
+  const lookupAddress = hasCachedResult ? address : settledAddress;
+
   // True while the selection is still settling. Counts as loading, so the
   // panel never shows one token's verdict under another token's name.
-  const settling = settledAddress.toLowerCase() !== address.toLowerCase();
+  const settling = lookupAddress.toLowerCase() !== address.toLowerCase();
 
   const { data, isLoading, isError, error } = useQuery<SafetyResponse, SafetyLookupError>({
-    queryKey: ["safety-goplus", settledAddress.toLowerCase()],
+    queryKey: safetyQueryKey(lookupAddress),
     queryFn: async ({ signal }) => {
       const qs = new URLSearchParams({
-        address: settledAddress,
+        address: lookupAddress,
         chainId: String(BNB_CHAIN.chainId),
       });
       // `signal` is aborted by React Query as soon as this query is superseded
@@ -324,7 +345,7 @@ export default function SafetyPanel({ address }: { address: Address }) {
       // leave the panel pending for ever.
       if (
         typeof json?.address !== "string" ||
-        json.address.toLowerCase() !== settledAddress.toLowerCase()
+        json.address.toLowerCase() !== lookupAddress.toLowerCase()
       ) {
         throw new SafetyLookupError(
           "Security lookup returned a different token",
@@ -380,7 +401,7 @@ export default function SafetyPanel({ address }: { address: Address }) {
       <div className="flex flex-col divide-y divide-hl-border">
         {CHECK_ORDER.map((id) => {
           if (pending) return <LoadingRow key={id} id={id} />;
-          if (goPlusFailed) return <FallbackRow key={id} address={settledAddress} id={id} />;
+          if (goPlusFailed) return <FallbackRow key={id} address={lookupAddress} id={id} />;
           const check = byId.get(id);
           if (check) return <CheckRowView key={id} check={check} />;
           // A row the service did not answer is unknown, never a pass.
