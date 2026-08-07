@@ -18,22 +18,27 @@ export type TokenInfo = {
 /**
  * Tradable tokens on BNB Chain (chainId 56).
  *
- * DECIMALS WARNING: on BNB Chain, USDT and USDC are 18 decimals — not the
+ * DECIMALS WARNING: on BNB Chain, USDT and USDC are 18 decimals, not the
  * 6 decimals they use on Ethereum and Arbitrum. Getting this wrong misprices
- * a trade by 10^12. Verify decimals on BscScan alongside each address.
+ * a trade by 10^12.
+ *
+ * Every address and decimals value below was verified on BscScan on
+ * 2026-08-06, and cross-checked by reading symbol/name/decimals directly
+ * from each contract on chain 56.
  */
 export const BNB_TOKENS: TokenInfo[] = [
   {
     symbol: "BNB",
     name: "BNB",
-    // TODO: verify on BscScan before mainnet use — native sentinel, not a contract.
+    // Standard native-asset sentinel, not a deployed contract, so there is
+    // nothing on BscScan to verify against.
     address: NATIVE_TOKEN_SENTINEL,
     decimals: 18,
   },
   {
     symbol: "WBNB",
     name: "Wrapped BNB",
-    // TODO: verify on BscScan before mainnet use —
+    // Verified on BscScan 2026-08-06: symbol WBNB, name "Wrapped BNB", 18 decimals.
     // https://bscscan.com/address/0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c
     address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
     decimals: 18,
@@ -41,23 +46,25 @@ export const BNB_TOKENS: TokenInfo[] = [
   {
     symbol: "USDT",
     name: "Tether USD (BSC-USD)",
-    // TODO: verify on BscScan before mainnet use —
+    // Verified on BscScan 2026-08-06: symbol USDT, on-chain name "Tether USD".
     // https://bscscan.com/address/0x55d398326f99059fF775485246999027B3197955
     address: "0x55d398326f99059fF775485246999027B3197955",
-    decimals: 18, // TODO: verify — 18 on BSC, unlike 6 on Ethereum.
+    decimals: 18, // Verified 2026-08-06. 18 on BSC, unlike 6 on Ethereum.
   },
   {
     symbol: "USDC",
     name: "USD Coin (Binance-Peg)",
-    // TODO: verify on BscScan before mainnet use —
+    // Verified on BscScan 2026-08-06: symbol USDC, on-chain name "USD Coin".
     // https://bscscan.com/address/0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d
     address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-    decimals: 18, // TODO: verify — 18 on BSC, unlike 6 on Ethereum.
+    decimals: 18, // Verified 2026-08-06. 18 on BSC, unlike 6 on Ethereum.
   },
   {
     symbol: "CAKE",
     name: "PancakeSwap Token",
-    // TODO: verify on BscScan before mainnet use —
+    // Verified on BscScan 2026-08-06: 18 decimals, name "PancakeSwap Token".
+    // On-chain symbol is "Cake"; displayed here as CAKE, which is how the
+    // project brands it.
     // https://bscscan.com/address/0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82
     address: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
     decimals: 18,

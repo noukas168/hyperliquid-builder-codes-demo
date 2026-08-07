@@ -20,7 +20,13 @@ import type { CheckId, SafetyCheck } from "@/lib/safety-types";
  */
 const publicClient = createPublicClient({ chain: bsc, transport: http() });
 
-// TODO: verify on BscScan before mainnet use — PancakeSwap V2 factory.
+/**
+ * PancakeSwap V2 factory. Verified on BscScan 2026-08-06: contract name
+ * PancakeFactory, labelled "PancakeSwap: Factory v2". Cross-checked on chain
+ * 56 by calling getPair(WBNB, USDT) and confirming the returned pair's
+ * token0/token1 are that pair and that its factory() points back here.
+ * https://bscscan.com/address/0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73
+ */
 const PANCAKE_V2_FACTORY: Address = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
 
 /** EIP-1967 implementation slot: keccak256("eip1967.proxy.implementation") - 1 */
