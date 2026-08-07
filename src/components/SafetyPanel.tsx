@@ -115,7 +115,13 @@ class SafetyLookupError extends Error {
   }
 }
 
-const MAX_LOOKUP_RETRIES = 3;
+/**
+ * Two retries, not three. The whole chain has to finish in about the time a
+ * user is willing to look at a spinner: a longer budget turns a throttle into
+ * a hang, and every token switched to during it shows the same stalled panel,
+ * which reads as the panel being stuck on one token.
+ */
+const MAX_LOOKUP_RETRIES = 2;
 
 /**
  * Retry only what can plausibly succeed on a second ask.
@@ -138,13 +144,18 @@ function shouldRetryLookup(failureCount: number, error: Error): boolean {
 }
 
 /**
- * A throttle needs real time to clear — measured against GoPlus, the window
- * lasts tens of seconds — so it backs off harder than a network blip.
- * Throttle: 5s, 10s, 20s. Everything else: 1s, 2s, 4s.
+ * Total retry budget is roughly the settle delay plus one more attempt —
+ * about 5s for a throttle (1.5s + 3s), 1.5s for anything else (0.5s + 1s).
+ *
+ * A GoPlus throttle can outlast that; waiting it out is not the job here. Two
+ * quick attempts catch a window that has already cleared, and anything longer
+ * is caught by the query going stale on failure, which refetches on remount or
+ * window refocus. Better to degrade visibly in seconds and recover later than
+ * to hold the panel on "Checking…" for half a minute.
  */
 function lookupRetryDelay(failureCount: number, error: Error): number {
-  const base = error instanceof SafetyLookupError && error.throttled ? 5_000 : 1_000;
-  return Math.min(base * 2 ** failureCount, 30_000);
+  const base = error instanceof SafetyLookupError && error.throttled ? 1_500 : 500;
+  return Math.min(base * 2 ** failureCount, 5_000);
 }
 
 /** Raw field value. Addresses link out rather than sitting there bare. */
@@ -318,7 +329,10 @@ export default function SafetyPanel({ address }: { address: Address }) {
   // panel never shows one token's verdict under another token's name.
   const settling = lookupAddress.toLowerCase() !== address.toLowerCase();
 
-  const { data, isLoading, isError, error } = useQuery<SafetyResponse, SafetyLookupError>({
+  const { data, isLoading, isError, error, failureReason } = useQuery<
+    SafetyResponse,
+    SafetyLookupError
+  >({
     queryKey: safetyQueryKey(lookupAddress),
     queryFn: async ({ signal }) => {
       const qs = new URLSearchParams({
@@ -371,7 +385,15 @@ export default function SafetyPanel({ address }: { address: Address }) {
 
   const pending = settling || isLoading || (!current && !isError);
   const goPlusFailed = !settling && isError;
-  const throttled = goPlusFailed && error?.throttled === true;
+
+  /**
+   * `error` is only set once the retry chain gives up. `failureReason` carries
+   * the most recent failure while retries are still in flight, and React Query
+   * clears it on success — so this reports a throttle from the first 429
+   * rather than making the user wait out the retries to be told why.
+   */
+  const lastFailure = error ?? failureReason;
+  const throttled = !settling && lastFailure?.throttled === true;
   const byId = new Map((current?.checks ?? []).map((c) => [c.id, c]));
 
   return (
@@ -385,8 +407,12 @@ export default function SafetyPanel({ address }: { address: Address }) {
         {throttled ? (
           <p className="text-[11px] font-semibold text-hl-warning">
             These checks are temporarily throttled — too many security lookups were made in a short
-            time. Wait a moment and check again. In the meantime, only what we can read directly
-            from BNB Chain is shown below.
+            time.{" "}
+            {pending
+              ? // Still retrying: the rows below say "checking", so promising
+                // on-chain results here would be describing the wrong screen.
+                "Trying again for a few seconds."
+              : "Only what we can read directly from BNB Chain is shown below. Wait a moment and check again."}
           </p>
         ) : (
           goPlusFailed && (
