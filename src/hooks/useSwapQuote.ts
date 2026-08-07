@@ -18,6 +18,17 @@ export type ZeroExPrice = {
   fees?: { integratorFee?: ZeroExFee; zeroExFee?: ZeroExFee; gasFee?: ZeroExFee };
   issues?: { allowance?: { actual: string; spender: string } | null; balance?: unknown };
   route?: { fills?: Array<{ source: string; proportionBps?: string }> };
+  /** Transfer-tax metadata. Non-zero means a fee-on-transfer token. */
+  tokenMetadata?: {
+    buyToken?: TokenTaxMetadata;
+    sellToken?: TokenTaxMetadata;
+  };
+};
+
+export type TokenTaxMetadata = {
+  buyTaxBps?: string;
+  sellTaxBps?: string;
+  transferTaxBps?: string;
 };
 
 const DEBOUNCE_MS = 500;
@@ -76,6 +87,8 @@ export function useSwapQuote(args: {
     sources: d?.route?.fills?.map((f) => f.source) ?? [],
     allowanceIssue: d?.issues?.allowance ?? null,
     noLiquidity: d ? d.liquidityAvailable === false : false,
+    sellTokenTax: d?.tokenMetadata?.sellToken,
+    buyTokenTax: d?.tokenMetadata?.buyToken,
     // Stale-while-typing: the debounce gap counts as loading so the UI never
     // shows a number that belongs to a previous keystroke.
     isLoading: isEnabled && (query.isFetching || debouncedAmount !== sellAmount),
