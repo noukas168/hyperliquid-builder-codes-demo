@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { Address } from "viem";
 import { BNB_CHAIN } from "@/config/chains";
+import { isNativeToken } from "@/config/tokens";
 import { checkHoneypot, checkMintAuthority, checkOwnership, checkTax } from "@/lib/safety";
 import {
   CHECK_HELP,
@@ -301,6 +302,13 @@ const safetyQueryKey = (address: string) => ["safety-goplus", address.toLowerCas
 export default function SafetyPanel({ address }: { address: Address }) {
   const queryClient = useQueryClient();
 
+  /**
+   * The native coin is a sentinel, not a deployed contract, so GoPlus has
+   * nothing to return for it and answers 404. That is a normal condition, not
+   * a failure of the service, and must not be reported as one.
+   */
+  const isNative = isNativeToken(address);
+
   // The token actually being looked up. Trails `address` by the settle delay,
   // so a token skipped past in under that never triggers a request at all.
   const [settledAddress, setSettledAddress] = useState<Address>(address);
@@ -373,6 +381,8 @@ export default function SafetyPanel({ address }: { address: Address }) {
     // re-asking. A failed one must not be frozen in place: going stale lets it
     // retry on remount or when the window regains focus, so a throttle that
     // outlives the retries above still recovers without a page reload.
+    // No contract, nothing to ask about: never spend a lookup on the sentinel.
+    enabled: !isNative,
     staleTime: (query) => (query.state.status === "error" ? 0 : Number.POSITIVE_INFINITY),
     retry: shouldRetryLookup,
     retryDelay: lookupRetryDelay,
@@ -394,6 +404,27 @@ export default function SafetyPanel({ address }: { address: Address }) {
    */
   const lastFailure = error ?? failureReason;
   const throttled = !settling && lastFailure?.throttled === true;
+
+  // Placed after every hook so the hook order is unconditional.
+  if (isNative) {
+    return (
+      <section className="flex flex-col gap-1 rounded-md border border-hl-border bg-hl-bg p-3">
+        <div className="flex flex-col gap-1 pb-1">
+          <h3 className="text-sm font-semibold text-white">Safety checks</h3>
+          <p className="text-[11px] leading-snug text-hl-muted">
+            {BNB_CHAIN.nativeSymbol} is the native coin of {BNB_CHAIN.label}, not a token contract.
+            These checks look for things only a contract can do — mint new supply, charge a transfer
+            tax, pause trading, hold liquidity that can be pulled. There is no contract here to do
+            any of them, so there is nothing to check.
+          </p>
+        </div>
+        <p className="border-hl-border border-t pt-2 text-[11px] font-semibold text-hl-muted">
+          This is not a verdict that {BNB_CHAIN.nativeSymbol} is a safe thing to hold. Its price can
+          still fall. It only means the contract-level risks listed above do not exist for it.
+        </p>
+      </section>
+    );
+  }
   const byId = new Map((current?.checks ?? []).map((c) => [c.id, c]));
 
   return (
