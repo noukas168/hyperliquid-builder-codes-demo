@@ -12,6 +12,7 @@ import {
 } from "viem";
 import { bsc } from "viem/chains";
 import { BNB_CHAIN } from "@/config/chains";
+import type { CheckId, SafetyCheck } from "@/lib/safety-types";
 
 /**
  * Client-side only: the tax and honeypot checks call our own /api/0x/*
@@ -43,18 +44,7 @@ const MINT_SIGNATURES = [
 ] as const;
 const MINT_SELECTORS = MINT_SIGNATURES.map((sig) => toFunctionSelector(sig).slice(2).toLowerCase());
 
-export type CheckStatus = "PASS" | "WARN" | "FAIL" | "UNKNOWN";
-export type CheckId = "honeypot" | "tax" | "mintAuthority" | "ownership";
-
-export type SafetyCheck = {
-  id: CheckId;
-  label: string;
-  status: CheckStatus;
-  /** Plain English. Must read correctly on its own, without the status. */
-  detail: string;
-  /** Raw on-chain value behind the verdict, for the curious. */
-  evidence?: string;
-};
+export type { CheckId, CheckStatus, SafetyCheck } from "@/lib/safety-types";
 
 export type SafetyReport = {
   address: Address;

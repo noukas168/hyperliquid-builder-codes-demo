@@ -2,15 +2,17 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { Address } from "viem";
+import { BNB_CHAIN } from "@/config/chains";
+import { checkHoneypot, checkMintAuthority, checkOwnership, checkTax } from "@/lib/safety";
 import {
+  CHECK_LABELS,
+  CHECK_ORDER,
   type CheckId,
   type CheckStatus,
-  checkHoneypot,
-  checkMintAuthority,
-  checkOwnership,
-  checkTax,
   type SafetyCheck,
-} from "@/lib/safety";
+  type SafetyResponse,
+  unknownCheck,
+} from "@/lib/safety-types";
 
 /**
  * Traffic-light colours. None of these is the brand red (#E5341F), which is
@@ -30,18 +32,13 @@ const STATUS_WORD: Record<CheckStatus, string> = {
   UNKNOWN: "Could not check",
 };
 
-type CheckConfig = {
-  id: CheckId;
-  label: string;
-  run: (address: Address) => Promise<SafetyCheck>;
+/** On-chain equivalents, used only when GoPlus is unavailable. */
+const ONCHAIN_FALLBACK: Partial<Record<CheckId, (address: Address) => Promise<SafetyCheck>>> = {
+  honeypot: checkHoneypot,
+  tax: checkTax,
+  mintAuthority: checkMintAuthority,
+  ownership: checkOwnership,
 };
-
-const CHECKS: CheckConfig[] = [
-  { id: "honeypot", label: "Can it be sold", run: checkHoneypot },
-  { id: "tax", label: "Transfer tax", run: checkTax },
-  { id: "mintAuthority", label: "Mint authority", run: checkMintAuthority },
-  { id: "ownership", label: "Ownership", run: checkOwnership },
-];
 
 function StatusDot({ status }: { status: CheckStatus }) {
   return (
@@ -53,38 +50,7 @@ function StatusDot({ status }: { status: CheckStatus }) {
   );
 }
 
-/** One row, loading independently so a slow check never blocks the panel. */
-function CheckRow({ address, config }: { address: Address; config: CheckConfig }) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["safety", config.id, address.toLowerCase()],
-    queryFn: () => config.run(address),
-    staleTime: Number.POSITIVE_INFINITY,
-    retry: false,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-start gap-2 py-1.5">
-        <StatusDot status="UNKNOWN" />
-        <div className="flex flex-col">
-          <span className="text-xs font-semibold text-white">{config.label}</span>
-          <span className="text-[11px] text-hl-muted">Checking on BNB Chain…</span>
-        </div>
-      </div>
-    );
-  }
-
-  // A failed check is a check we could not make — never a pass.
-  const check: SafetyCheck =
-    isError || !data
-      ? {
-          id: config.id,
-          label: config.label,
-          status: "UNKNOWN",
-          detail: "This check could not be completed, so nothing is known either way.",
-        }
-      : data;
-
+function CheckRowView({ check }: { check: SafetyCheck }) {
   return (
     <div className="flex items-start gap-2 py-1.5">
       <StatusDot status={check.status} />
@@ -109,22 +75,110 @@ function CheckRow({ address, config }: { address: Address; config: CheckConfig }
   );
 }
 
+function LoadingRow({ label }: { label: string }) {
+  return (
+    <div className="flex items-start gap-2 py-1.5">
+      <StatusDot status="UNKNOWN" />
+      <div className="flex flex-col">
+        <span className="text-xs font-semibold text-white">{label}</span>
+        <span className="text-[11px] text-hl-muted">Checking…</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Fallback row: runs the on-chain check for this id, or renders UNKNOWN when
+ * there is no on-chain equivalent. Each row loads independently.
+ */
+function FallbackRow({ address, id }: { address: Address; id: CheckId }) {
+  const run = ONCHAIN_FALLBACK[id];
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["safety-onchain", id, address.toLowerCase()],
+    queryFn: () => {
+      if (!run) throw new Error("no on-chain equivalent");
+      return run(address);
+    },
+    enabled: Boolean(run),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+
+  if (!run) {
+    return (
+      <CheckRowView
+        check={unknownCheck(
+          id,
+          "This check needs the security data service, which is unavailable right now. It cannot be answered from the chain alone.",
+        )}
+      />
+    );
+  }
+  if (isLoading) return <LoadingRow label={CHECK_LABELS[id]} />;
+  if (isError || !data) {
+    return (
+      <CheckRowView
+        check={unknownCheck(
+          id,
+          "This check could not be completed, so nothing is known either way.",
+        )}
+      />
+    );
+  }
+  return <CheckRowView check={data} />;
+}
+
 export default function SafetyPanel({ address }: { address: Address }) {
+  const {
+    data,
+    isLoading,
+    isError: goPlusFailed,
+  } = useQuery<SafetyResponse>({
+    queryKey: ["safety-goplus", address.toLowerCase()],
+    queryFn: async () => {
+      const qs = new URLSearchParams({ address, chainId: String(BNB_CHAIN.chainId) });
+      const res = await fetch(`/api/safety?${qs.toString()}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Security lookup failed");
+      return json as SafetyResponse;
+    },
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+
+  const byId = new Map((data?.checks ?? []).map((c) => [c.id, c]));
+
   return (
     <section className="flex flex-col gap-1 rounded-md border border-hl-border bg-hl-bg p-3">
       <div className="flex flex-col gap-1 pb-1">
         <h3 className="text-sm font-semibold text-white">Safety checks</h3>
         <p className="text-[11px] leading-snug text-hl-muted">
-          These read what BNB Chain can prove about this contract. Finding no red flag is not the
-          same as finding it safe — a grey result means we could not check, not that the token
-          passed.
+          Finding no red flag is not the same as finding it safe — a grey result means we could not
+          check, not that the token passed.
         </p>
+        {goPlusFailed && (
+          <p className="text-[11px] font-semibold text-hl-warning">
+            The security data service is unavailable, so these fall back to what we can read
+            directly from BNB Chain. Fewer checks are possible this way.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col divide-y divide-hl-border">
-        {CHECKS.map((config) => (
-          <CheckRow key={config.id} address={address} config={config} />
-        ))}
+        {CHECK_ORDER.map((id) => {
+          if (isLoading) return <LoadingRow key={id} label={CHECK_LABELS[id]} />;
+          if (goPlusFailed) return <FallbackRow key={id} address={address} id={id} />;
+          const check = byId.get(id);
+          return check ? (
+            <CheckRowView key={id} check={check} />
+          ) : (
+            // A row the service simply did not answer is unknown, never a pass.
+            <CheckRowView
+              key={id}
+              check={unknownCheck(id, "This check was not returned for this token.")}
+            />
+          );
+        })}
       </div>
 
       <p className="border-hl-border border-t pt-2 text-[11px] font-semibold text-hl-muted">
