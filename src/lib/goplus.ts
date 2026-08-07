@@ -334,10 +334,101 @@ function mapHolderConcentration(t: GoPlusToken): SafetyCheck {
 // ─────────────────────────── Fetch + assemble ───────────────────────────
 
 export type GoPlusOutcome =
-  | { ok: true; checks: SafetyCheck[] }
+  | { ok: true; checks: SafetyCheck[]; cached: boolean }
   | { ok: false; status: number; error: string };
 
+/**
+ * GoPlus reports rate limiting INSIDE a HTTP 200 body, as code 4029 with
+ * message "too many requests". It does not send HTTP 429 — a `res.status`
+ * check for that never fires. Verified live against chain 56: bursting the
+ * endpoint returns `{"code":4029,"message":"too many requests"}` with a 200.
+ */
+const GOPLUS_RATE_LIMITED_CODE = 4029;
+
+/**
+ * Successful lookups only, keyed by `chainId:loweredAddress`.
+ *
+ * Five minutes. The figures behind these rows — ownership, mint authority,
+ * tax, honeypot behaviour — are contract properties that change rarely, but
+ * this is a warning system, so staleness has a real cost: a token whose owner
+ * switches on a tax should stop reading PASS quickly. Five minutes is short
+ * enough that such a change surfaces within one sitting, and long enough that
+ * switching back and forth between tokens in a single browsing session costs
+ * one GoPlus call per token rather than one per click. That matters because
+ * the unauthenticated limit is reached after roughly ten calls.
+ */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+/** Bound the map: any address can be looked up, so this must not grow freely. */
+const CACHE_MAX_ENTRIES = 500;
+
+type CacheEntry = { checks: SafetyCheck[]; expiresAt: number };
+
+const cache = new Map<string, CacheEntry>();
+
+const cacheKey = (address: string, chainId: number) => `${chainId}:${address.toLowerCase()}`;
+
+function cacheGet(key: string, now: number): SafetyCheck[] | undefined {
+  const hit = cache.get(key);
+  if (!hit) return undefined;
+  if (hit.expiresAt <= now) {
+    cache.delete(key);
+    return undefined;
+  }
+  return hit.checks;
+}
+
+function cacheSet(key: string, checks: SafetyCheck[], now: number) {
+  // Re-inserting moves the key to the end, so the first key is the oldest.
+  cache.delete(key);
+  if (cache.size >= CACHE_MAX_ENTRIES) {
+    const oldest = cache.keys().next();
+    if (!oldest.done) cache.delete(oldest.value);
+  }
+  cache.set(key, { checks, expiresAt: now + CACHE_TTL_MS });
+}
+
+/**
+ * Verbose per-call tracing, including a prefix of the raw response body.
+ * Useful when GoPlus starts answering in a shape we do not expect, noisy
+ * otherwise, so it is off unless GOPLUS_DEBUG is set. Read once at module
+ * load: changing it takes a restart.
+ */
+const GOPLUS_DEBUG = /^(1|true)$/i.test(process.env.GOPLUS_DEBUG ?? "");
+
+function line(address: string, fields: Record<string, unknown>) {
+  return `[goplus] ${address} ${Object.entries(fields)
+    .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .join(" ")}`;
+}
+
+/**
+ * Failures worth seeing in any environment. Kept to parsed fields — never the
+ * raw body — so it stays a single short line. A swallowed rate limit is what
+ * made this bug invisible in the first place; it should not go quiet again.
+ */
+function logGoPlus(address: string, fields: Record<string, unknown>) {
+  console.warn(line(address, fields));
+}
+
+/** Off by default. Carries the response body, so it must stay opt-in. */
+function debugGoPlus(address: string, fields: Record<string, unknown>) {
+  if (!GOPLUS_DEBUG) return;
+  console.log(line(address, fields));
+}
+
+const BODY_LOG_LIMIT = 400;
+
 export async function fetchGoPlusChecks(address: string, chainId: number): Promise<GoPlusOutcome> {
+  const now = Date.now();
+  const key = cacheKey(address, chainId);
+
+  const cached = cacheGet(key, now);
+  if (cached) {
+    debugGoPlus(address, { cache: "hit" });
+    return { ok: true, checks: cached, cached: true };
+  }
+
   const url = `${GOPLUS_BASE}/${chainId}?contract_addresses=${address}`;
   const token = process.env.GOPLUS_ACCESS_TOKEN;
 
@@ -347,25 +438,44 @@ export async function fetchGoPlusChecks(address: string, chainId: number): Promi
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       cache: "no-store",
     });
-  } catch {
+  } catch (e) {
+    logGoPlus(address, { phase: "network", authed: Boolean(token), err: String(e) });
     return { ok: false, status: 502, error: "Could not reach the GoPlus security API" };
   }
 
-  if (res.status === 429) {
-    return { ok: false, status: 429, error: "GoPlus rate limit reached" };
-  }
+  const raw = await res.text().catch(() => "");
+  debugGoPlus(address, {
+    httpStatus: res.status,
+    authed: Boolean(token),
+    contentType: res.headers.get("content-type") ?? "none",
+    bodyBytes: raw.length,
+    body: raw.slice(0, BODY_LOG_LIMIT),
+  });
+
   if (!res.ok) {
     return { ok: false, status: 502, error: "The GoPlus security API rejected the request" };
   }
 
   let body: { code?: number; message?: string; result?: Record<string, GoPlusToken> };
   try {
-    body = await res.json();
+    body = JSON.parse(raw);
   } catch {
     return { ok: false, status: 502, error: "Malformed response from the GoPlus security API" };
   }
 
+  // Rate limiting arrives here, not as a status code. Never cached: this says
+  // nothing about the token, only that we asked too often.
+  if (body.code === GOPLUS_RATE_LIMITED_CODE) {
+    logGoPlus(address, { rejected: "rateLimit", code: body.code, message: body.message ?? null });
+    return { ok: false, status: 429, error: "GoPlus rate limit reached" };
+  }
+
   if (body.code !== 1) {
+    logGoPlus(address, {
+      rejected: "code",
+      code: body.code ?? null,
+      message: body.message ?? null,
+    });
     return { ok: false, status: 502, error: "GoPlus could not complete this lookup" };
   }
 
@@ -377,16 +487,20 @@ export async function fetchGoPlusChecks(address: string, chainId: number): Promi
     return { ok: false, status: 404, error: "GoPlus has no security data for this token" };
   }
 
-  return {
-    ok: true,
-    checks: [
-      mapHoneypot(token_),
-      mapTax(token_),
-      mapMint(token_),
-      mapOwnerPrivileges(token_),
-      mapOwnership(token_),
-      mapLpLock(token_),
-      mapHolderConcentration(token_),
-    ],
-  };
+  const checks = [
+    mapHoneypot(token_),
+    mapTax(token_),
+    mapMint(token_),
+    mapOwnerPrivileges(token_),
+    mapOwnership(token_),
+    mapLpLock(token_),
+    mapHolderConcentration(token_),
+  ];
+
+  // Only a complete, successful lookup is worth keeping. Errors and rate-limit
+  // responses are deliberately not cached — caching them would turn a
+  // momentary throttle into minutes of "we could not check".
+  cacheSet(key, checks, now);
+
+  return { ok: true, checks, cached: false };
 }

@@ -98,6 +98,19 @@ function HelpTip({ id, detail }: { id: CheckId; detail?: string }) {
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
+/**
+ * Being throttled is not the same as the service being down, and the panel
+ * must not conflate them: one clears itself in a moment, the other does not.
+ */
+class SafetyLookupError extends Error {
+  readonly throttled: boolean;
+  constructor(message: string, throttled: boolean) {
+    super(message);
+    this.name = "SafetyLookupError";
+    this.throttled = throttled;
+  }
+}
+
 /** Raw field value. Addresses link out rather than sitting there bare. */
 function EvidenceValue({ value }: { value: string }) {
   if (ADDRESS_RE.test(value)) {
@@ -233,19 +246,26 @@ export default function SafetyPanel({ address }: { address: Address }) {
     data,
     isLoading,
     isError: goPlusFailed,
-  } = useQuery<SafetyResponse>({
+    error,
+  } = useQuery<SafetyResponse, SafetyLookupError>({
     queryKey: ["safety-goplus", address.toLowerCase()],
     queryFn: async () => {
       const qs = new URLSearchParams({ address, chainId: String(BNB_CHAIN.chainId) });
       const res = await fetch(`/api/safety?${qs.toString()}`);
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "Security lookup failed");
+      if (!res.ok) {
+        throw new SafetyLookupError(
+          json?.error ?? "Security lookup failed",
+          json?.throttled === true,
+        );
+      }
       return json as SafetyResponse;
     },
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
 
+  const throttled = goPlusFailed && error?.throttled === true;
   const byId = new Map((data?.checks ?? []).map((c) => [c.id, c]));
 
   return (
@@ -256,11 +276,19 @@ export default function SafetyPanel({ address }: { address: Address }) {
           Finding no red flag is not the same as finding it safe. A grey result means we could not
           check, not that the token passed.
         </p>
-        {goPlusFailed && (
+        {throttled ? (
           <p className="text-[11px] font-semibold text-hl-warning">
-            The security data service is unavailable, so these fall back to what we can read
-            directly from BNB Chain. Fewer checks are possible this way.
+            These checks are temporarily throttled — too many security lookups were made in a short
+            time. Wait a moment and check again. In the meantime, only what we can read directly
+            from BNB Chain is shown below.
           </p>
+        ) : (
+          goPlusFailed && (
+            <p className="text-[11px] font-semibold text-hl-warning">
+              The security data service is unavailable, so these fall back to what we can read
+              directly from BNB Chain. Fewer checks are possible this way.
+            </p>
+          )
         )}
       </div>
 

@@ -24,10 +24,20 @@ export async function GET(req: NextRequest) {
 
   const outcome = await fetchGoPlusChecks(address, SUPPORTED_CHAIN_ID);
   if (!outcome.ok) {
-    // The client falls back to on-chain checks on any non-200 here.
-    return NextResponse.json({ error: outcome.error }, { status: outcome.status });
+    // The client falls back to on-chain checks on any non-200 here. A 429 is
+    // called out separately so the panel can say "throttled, try again"
+    // rather than the false claim that the service is down.
+    return NextResponse.json(
+      { error: outcome.error, throttled: outcome.status === 429 },
+      { status: outcome.status },
+    );
   }
 
   const body: SafetyResponse = { address, source: "goplus", checks: outcome.checks };
-  return NextResponse.json(body, { status: 200 });
+  return NextResponse.json(body, {
+    status: 200,
+    // Never let a shared cache hold safety verdicts; the server-side cache in
+    // fetchGoPlusChecks is the only intended layer.
+    headers: { "Cache-Control": "no-store", "X-Safety-Cache": outcome.cached ? "hit" : "miss" },
+  });
 }
