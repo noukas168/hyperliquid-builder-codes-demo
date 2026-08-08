@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { Roboto, Ubuntu } from "next/font/google";
+import { Inter, JetBrains_Mono, Roboto, Ubuntu } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 
+// Ubuntu and Roboto are the Dwellir brand faces, still used by the Hyperliquid
+// wizard at /hyperliquid.
 const ubuntu = Ubuntu({
   subsets: ["latin"],
   weight: ["400", "700"],
@@ -15,6 +17,21 @@ const roboto = Roboto({
   variable: "--font-roboto",
 });
 
+// Basis interface text.
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-inter",
+});
+
+// Every numeral in Basis. A monospace with tabular figures is what keeps
+// digits in their column and decimal points aligned down a table.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono",
+});
+
 export const metadata: Metadata = {
   // Basis is the root route, so this is its metadata as well as the default
   // for anything without its own. /hyperliquid overrides it.
@@ -23,18 +40,16 @@ export const metadata: Metadata = {
     "Non-custodial spot trading on BNB Chain. Safety checks on every token, shown before you trade.",
 };
 
+const fontVars = `${ubuntu.variable} ${roboto.variable} ${inter.variable} ${jetbrainsMono.variable}`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`next-dark-theme ${ubuntu.variable} ${roboto.variable}`}>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600;700&family=Roboto:wght@400;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className={`${ubuntu.variable} ${roboto.variable}`}>
+    // next/font self-hosts every face above and serves it from this origin.
+    // The hand-written <link> to fonts.googleapis.com that used to sit here was
+    // both redundant and render-blocking, and it was the reason the CSS
+    // variables had to name the families literally.
+    <html lang="en" className={`next-dark-theme ${fontVars}`}>
+      <body className={fontVars}>
         <Providers>{children}</Providers>
       </body>
     </html>

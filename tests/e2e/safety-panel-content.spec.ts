@@ -46,20 +46,20 @@ test.describe("safety panel, per-token content", () => {
     await visit(page);
 
     // USDT is stubbed as clean throughout.
-    await expect(verdictRow(page, "Can it be sold")).toContainText("No problem found");
-    await expect(verdictRow(page, "Transfer tax")).toContainText("No problem found");
+    await expect(verdictRow(page, "honeypot")).toContainText("No problem found");
+    await expect(verdictRow(page, "tax")).toContainText("No problem found");
 
     // CAKE is stubbed FAIL on honeypot and WARN on tax, and those must land on
     // their own rows rather than colouring the whole panel.
     await selectBuyToken(page, TOKENS.CAKE);
-    await expect(verdictRow(page, "Can it be sold")).toContainText("Serious problem");
-    await expect(verdictRow(page, "Transfer tax")).toContainText("Take care");
-    await expect(verdictRow(page, "Mint authority")).toContainText("No problem found");
+    await expect(verdictRow(page, "honeypot")).toContainText("Serious problem");
+    await expect(verdictRow(page, "tax")).toContainText("Take care");
+    await expect(verdictRow(page, "mintAuthority")).toContainText("No problem found");
 
     // USDC is stubbed UNKNOWN on ownership: a check we could not make is never
     // allowed to read as a pass.
     await selectBuyToken(page, TOKENS.USDC);
-    await expect(verdictRow(page, "Ownership")).toContainText("Could not check");
+    await expect(verdictRow(page, "ownership")).toContainText("Could not check");
   });
 
   test("treats the native coin as out of scope, not as a failed lookup", async ({ page }) => {

@@ -4,10 +4,15 @@
 
 /* ─── Dwellir Token Scaffold ─── */
 :root {
+  /* next/font serves these under generated family names, so the variables it
+     defines are the only reliable way to reference them. Naming the families
+     literally here would silently fall through to a system font. */
   --font-family-heading:
-    "Ubuntu", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    var(--font-ubuntu), -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial,
+    sans-serif;
   --font-family-body:
-    "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    var(--font-roboto), -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial,
+    sans-serif;
   --font-weight-regular: 400;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
@@ -122,4 +127,81 @@ samp {
 /* RainbowKit modal override */
 [data-rk] {
   --rk-radii-modal: 12px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Basis design tokens
+
+   A separate layer from the hl-* tokens above, which are shared with the
+   Hyperliquid wizard at /hyperliquid. Redefining those would restyle that
+   route as a side effect of a pass scoped to Basis.
+
+   Basis is dark only, so these are flat values rather than a themed pair.
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Neutral ramp ──
+     One ordered scale rather than ad hoc greys. Every neutral in the Basis
+     interface is a step on this ramp, so two greys are either the same
+     decision or visibly different ones. Cool-tinted, so the warm brand red
+     stays separate from the surface it sits on. */
+  --bs-n0: #0a0b0d; /* page ground, near-black */
+  --bs-n1: #101215; /* card surface */
+  --bs-n2: #16191d; /* inset: inputs, raised rows */
+  --bs-n3: #1e2227; /* hover */
+  --bs-n4: #23282e; /* hairline border */
+  --bs-n5: #333a42; /* strong border, selected */
+  /* Contrast ratios below are against --bs-n0, the page ground. */
+  --bs-n6: #5a626d; /* disabled and de-emphasised, 3.2:1, never load-bearing */
+  --bs-n7: #8a929d; /* labels and secondary text, 6.3:1 */
+  --bs-n8: #b8bfc8; /* body text, 10.6:1 */
+  --bs-n9: #e8ebef; /* primary text and figures, 16.5:1 */
+
+  /* ── Semantic colour ──
+     Each of these means exactly one thing and appears nowhere else.
+
+     brand   identity only: the mark, the primary action, the header rule.
+             It is never applied to a number, a balance, an address or a
+             status, because a brand colour carrying data would make the
+             interface's loudest signal meaningless.
+     success a positive verdict.
+     alarm   a negative verdict. Deliberately a hotter, pinker red than the
+             brand brick so the two never read as the same signal, which
+             they would at closer hues.
+     warn    a qualified verdict, take care.
+
+     Uncertainty has no colour at all: an unknown or could-not-check state
+     uses --bs-n7, because colouring it would present it as a verdict. */
+  --bs-brand: #e23a2e;
+  --bs-success: #2fbf71;
+  --bs-alarm: #ff2d55;
+  --bs-warn: #f0a21a;
+
+  /* Focus is neutral and bright: visible against every surface, and not
+     confusable with any semantic colour. */
+  --bs-focus: #e8ebef;
+
+  /* ── Type ──
+     Interface text and numerals are different typefaces on purpose: figures
+     are the product, and they should not look like prose. */
+  --bs-font-ui:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --bs-font-num:
+    var(--font-mono), ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Every figure in the interface is tabular, so digits hold their column when
+   a value changes and decimal points line up between stacked rows. */
+.bs-num {
+  font-family: var(--bs-font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+/* Keyboard focus stays visible everywhere on the Basis surface. Applied at
+   the container so no individual control can forget it. */
+.bs-surface :focus-visible {
+  outline: 2px solid var(--bs-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
 }

@@ -21,14 +21,20 @@ import {
 } from "@/lib/safety-types";
 
 /**
- * Traffic-light colours. None of these is the brand red (#E5341F), which is
- * reserved for the logo and the Swap button.
+ * One colour per verdict, drawn from the interface's semantic tokens.
+ *
+ * FAIL is the alarm red, a hotter and pinker red than the brand, which is
+ * reserved for the mark and the Swap button and never carries a signal.
+ *
+ * UNKNOWN is a neutral from the grey ramp and is deliberately not a colour at
+ * all: "we could not check" is the absence of a verdict, and tinting it would
+ * present it as one.
  */
 const STATUS_COLOR: Record<CheckStatus, string> = {
-  PASS: "#3FB950",
-  WARN: "#F59F00",
-  FAIL: "#F03E3E",
-  UNKNOWN: "#8B949E",
+  PASS: "var(--bs-success)",
+  WARN: "var(--bs-warn)",
+  FAIL: "var(--bs-alarm)",
+  UNKNOWN: "var(--bs-n7)",
 };
 
 const STATUS_WORD: Record<CheckStatus, string> = {
@@ -80,17 +86,28 @@ function HelpTip({ id, detail }: { id: CheckId; detail?: string }) {
             setHovered(false);
           }
         }}
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-hl-border text-[9px] font-bold text-hl-muted hover:border-hl-muted hover:text-white"
+        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-bs-n5 text-[9px] text-bs-n7 leading-none transition-colors hover:border-bs-n7 hover:text-bs-n9"
       >
         ?
       </button>
       {open && (
+        /**
+         * Opens above the trigger, not below it.
+         *
+         * Below, the tooltip appeared directly under the pointer that had just
+         * hovered the question mark, so the cursor covered its own first words
+         * and the trigger sat behind the panel's top edge. Above, the pointer
+         * is always outside the tooltip and the trigger stays uncovered.
+         *
+         * Width is clamped to the viewport so it cannot introduce a horizontal
+         * scrollbar on a narrow screen.
+         */
         <span
           role="tooltip"
-          className="absolute top-5 left-0 z-20 w-60 rounded border border-hl-border bg-hl-card p-2 text-[11px] font-normal leading-snug text-hl-text shadow-lg"
+          className="absolute bottom-full left-0 z-20 mb-1.5 w-[min(16rem,calc(100vw-3rem))] border border-bs-n5 bg-bs-n0 px-2 py-1.5 font-normal text-bs-2xs text-bs-n8 leading-snug"
         >
           <span className="block">{CHECK_HELP[id]}</span>
-          {detail && <span className="mt-1 block text-hl-muted">{detail}</span>}
+          {detail && <span className="mt-1 block text-bs-n6">{detail}</span>}
         </span>
       )}
     </span>
@@ -159,7 +176,10 @@ function lookupRetryDelay(failureCount: number, error: Error): number {
   return Math.min(base * 2 ** failureCount, 5_000);
 }
 
-/** Raw field value. Addresses link out rather than sitting there bare. */
+/**
+ * The raw field behind a verdict. Dim, monospaced and a size below the label,
+ * so it reads as the working rather than as a second headline.
+ */
 function EvidenceValue({ value }: { value: string }) {
   if (ADDRESS_RE.test(value)) {
     return (
@@ -167,30 +187,50 @@ function EvidenceValue({ value }: { value: string }) {
         href={BNB_CHAIN.addressUrl(value)}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-mono text-[10px] text-hl-muted underline hover:text-white"
+        className="bs-num text-bs-2xs text-bs-n6 underline decoration-bs-n5 underline-offset-2 transition-colors hover:text-bs-n8"
       >
         {value.slice(0, 6)}…{value.slice(-4)} on BscScan
       </a>
     );
   }
-  return <span className="break-all font-mono text-[10px] text-hl-muted">{value}</span>;
+  return <span className="bs-num break-all text-bs-2xs text-bs-n6">{value}</span>;
 }
 
 function StatusDot({ status }: { status: CheckStatus }) {
   return (
     <span
       aria-hidden
-      className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full"
+      className="mt-[5px] inline-block h-1.5 w-1.5 shrink-0 rounded-full"
       style={{ backgroundColor: STATUS_COLOR[status] }}
     />
   );
 }
 
+/**
+ * Figure rows arrive as "Prefix: value" in one string. Splitting on the first
+ * colon lets the value take the tabular numeral face while the prefix stays in
+ * the interface face. The rendered text is unchanged; only its typography is.
+ */
+function splitFigure(detail: string): { prefix: string; value: string | null } {
+  const at = detail.indexOf(": ");
+  if (at === -1) return { prefix: detail, value: null };
+  return { prefix: detail.slice(0, at), value: detail.slice(at + 2) };
+}
+
 /** Bare figure: no dot, no colour, no status pill. */
 function FigureRowView({ check }: { check: SafetyCheck }) {
+  const { prefix, value } = splitFigure(check.detail);
   return (
-    <div className="flex items-center gap-1.5 py-1.5">
-      <span className="text-xs text-hl-text">{check.detail}</span>
+    <div className="flex items-center gap-1.5 py-1.5" data-check-row={check.id}>
+      <span className="text-bs-n7 text-bs-xs">
+        {prefix}
+        {value !== null && (
+          <>
+            <span aria-hidden>: </span>
+            <span className="bs-num text-bs-n8">{value}</span>
+          </>
+        )}
+      </span>
       <HelpTip id={check.id} />
     </div>
   );
@@ -200,26 +240,21 @@ function CheckRowView({ check }: { check: SafetyCheck }) {
   if (check.kind === "figure") return <FigureRowView check={check} />;
 
   return (
-    <div className="flex items-start gap-2 py-1.5">
+    <div className="flex items-start gap-2 py-1.5" data-check-row={check.id}>
       <StatusDot status={check.status} />
-      <div className="flex min-w-0 flex-col">
-        <span className="flex flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-white">{check.label}</span>
+            <span className="font-medium text-bs-n9 text-bs-xs">{check.label}</span>
             <HelpTip id={check.id} detail={check.detail} />
           </span>
-          <span
-            className="text-[10px] font-semibold uppercase tracking-wide"
-            style={{ color: STATUS_COLOR[check.status] }}
-          >
+          {/* Sentence case at a size below the label: the dot carries the
+              signal, so the word does not need to shout it as well. */}
+          <span className="text-bs-2xs" style={{ color: STATUS_COLOR[check.status] }}>
             {STATUS_WORD[check.status]}
           </span>
         </span>
-        {check.evidence && (
-          <span className="mt-0.5">
-            <EvidenceValue value={check.evidence} />
-          </span>
-        )}
+        {check.evidence && <EvidenceValue value={check.evidence} />}
       </div>
     </div>
   );
@@ -228,21 +263,21 @@ function CheckRowView({ check }: { check: SafetyCheck }) {
 function LoadingRow({ id }: { id: CheckId }) {
   if (isFigureCheck(id)) {
     return (
-      <div className="flex items-center gap-1.5 py-1.5">
-        <span className="text-xs text-hl-muted">{FIGURE_PREFIX[id]}: checking…</span>
+      <div className="flex items-center gap-1.5 py-1.5" data-check-row={id}>
+        <span className="text-bs-n7 text-bs-xs">{FIGURE_PREFIX[id]}: checking…</span>
         <HelpTip id={id} />
       </div>
     );
   }
   return (
-    <div className="flex items-start gap-2 py-1.5">
+    <div className="flex items-start gap-2 py-1.5" data-check-row={id}>
       <StatusDot status="UNKNOWN" />
-      <div className="flex flex-col">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold text-white">{CHECK_LABELS[id]}</span>
+          <span className="font-medium text-bs-n9 text-bs-xs">{CHECK_LABELS[id]}</span>
           <HelpTip id={id} />
         </span>
-        <span className="text-[11px] text-hl-muted">Checking…</span>
+        <span className="text-bs-2xs text-bs-n7">Checking…</span>
       </div>
     </div>
   );
@@ -408,17 +443,15 @@ export default function SafetyPanel({ address }: { address: Address }) {
   // Placed after every hook so the hook order is unconditional.
   if (isNative) {
     return (
-      <section className="flex flex-col gap-1 rounded-md border border-hl-border bg-hl-bg p-3">
-        <div className="flex flex-col gap-1 pb-1">
-          <h3 className="text-sm font-semibold text-white">Safety checks</h3>
-          <p className="text-[11px] leading-snug text-hl-muted">
-            {BNB_CHAIN.nativeSymbol} is the native coin of {BNB_CHAIN.label}, not a token contract.
-            These checks look for things only a contract can do: mint new supply, charge a transfer
-            tax, pause trading, hold liquidity that can be pulled. There is no contract here to do
-            any of them, so there is nothing to check.
-          </p>
-        </div>
-        <p className="border-hl-border border-t pt-2 text-[11px] font-semibold text-hl-muted">
+      <section className="flex flex-col gap-2 border-bs-n4 border-t px-3.5 py-3">
+        <h3 className="font-semibold text-bs-base text-bs-n9">Safety checks</h3>
+        <p className="text-bs-n7 text-bs-xs">
+          {BNB_CHAIN.nativeSymbol} is the native coin of {BNB_CHAIN.label}, not a token contract.
+          These checks look for things only a contract can do: mint new supply, charge a transfer
+          tax, pause trading, hold liquidity that can be pulled. There is no contract here to do any
+          of them, so there is nothing to check.
+        </p>
+        <p className="border-bs-n4 border-t pt-2 font-medium text-bs-2xs text-bs-n7">
           This is not a verdict that {BNB_CHAIN.nativeSymbol} is a safe thing to hold. Its price can
           still fall. It only means the contract-level risks listed above do not exist for it.
         </p>
@@ -428,15 +461,15 @@ export default function SafetyPanel({ address }: { address: Address }) {
   const byId = new Map((current?.checks ?? []).map((c) => [c.id, c]));
 
   return (
-    <section className="flex flex-col gap-1 rounded-md border border-hl-border bg-hl-bg p-3">
-      <div className="flex flex-col gap-1 pb-1">
-        <h3 className="text-sm font-semibold text-white">Safety checks</h3>
-        <p className="text-[11px] leading-snug text-hl-muted">
+    <section className="border-bs-n4 border-t px-3.5 py-3">
+      <div className="flex flex-col gap-1.5 pb-1">
+        <h3 className="font-semibold text-bs-base text-bs-n9">Safety checks</h3>
+        <p className="text-bs-2xs text-bs-n7">
           Finding no red flag is not the same as finding it safe. A grey result means we could not
           check, not that the token passed.
         </p>
         {throttled ? (
-          <p className="text-[11px] font-semibold text-hl-warning">
+          <p className="border border-bs-warn/40 px-2 py-1.5 font-medium text-bs-2xs text-bs-warn">
             These checks are temporarily throttled. Too many security lookups were made in a short
             time.{" "}
             {pending
@@ -447,7 +480,7 @@ export default function SafetyPanel({ address }: { address: Address }) {
           </p>
         ) : (
           goPlusFailed && (
-            <p className="text-[11px] font-semibold text-hl-warning">
+            <p className="border border-bs-warn/40 px-2 py-1.5 font-medium text-bs-2xs text-bs-warn">
               The security data service is unavailable, so these fall back to what we can read
               directly from BNB Chain. Fewer checks are possible this way.
             </p>
@@ -455,7 +488,7 @@ export default function SafetyPanel({ address }: { address: Address }) {
         )}
       </div>
 
-      <div className="flex flex-col divide-y divide-hl-border">
+      <div className="mt-1 flex flex-col divide-y divide-bs-n4 border-bs-n4 border-t">
         {CHECK_ORDER.map((id) => {
           if (pending) return <LoadingRow key={id} id={id} />;
           if (goPlusFailed) return <FallbackRow key={id} address={lookupAddress} id={id} />;
@@ -473,7 +506,7 @@ export default function SafetyPanel({ address }: { address: Address }) {
         })}
       </div>
 
-      <p className="border-hl-border border-t pt-2 text-[11px] font-semibold text-hl-muted">
+      <p className="mt-2 border-bs-n4 border-t pt-2 font-medium text-bs-2xs text-bs-n7">
         Basis checks what the chain can prove. It cannot tell you a token is safe.
       </p>
     </section>

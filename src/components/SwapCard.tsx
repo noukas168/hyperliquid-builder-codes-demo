@@ -18,12 +18,39 @@ import { useSwapExecution } from "@/hooks/useSwapExecution";
 import { useSwapQuote } from "@/hooks/useSwapQuote";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 
-const ACCENT = "#E5341F";
 const SLIPPAGE_PRESETS = [50, 100, 300]; // bps → 0.5%, 1%, 3%
 const HIGH_SLIPPAGE_BPS = 500; // above 5% we shout
 const NATIVE_GAS_BUFFER = parseUnits("0.005", 18); // leave room for gas on MAX
 
 const UNVERIFIED_LABEL = "Address not checked by Basis";
+
+/**
+ * Shared row shape for anything label-then-figure. A two-column grid rather
+ * than a space-between flex, so every value in the card starts at the same
+ * x-position and the figures form a column instead of floating to their own
+ * ragged right edge.
+ */
+const ROW = "grid grid-cols-[1fr_auto] items-baseline gap-x-3";
+/** Labels are smaller and dimmer than the figures they describe. */
+const LABEL = "text-bs-xs text-bs-n7";
+
+/**
+ * A figure and its unit.
+ *
+ * The unit sits in its own fixed-width column rather than trailing the number,
+ * so the numerals right-align against a common edge and the decimal points
+ * stack down the table. Rows with no unit still reserve the column, so they do
+ * not pull their figure out of the stack. The space before the unit is real
+ * text, which keeps the row reading as "0.001000 BNB" to a screen reader.
+ */
+function Figure({ value, unit }: { value: string; unit?: string }) {
+  return (
+    <dd className="text-right text-bs-sm">
+      <span className="bs-num text-bs-n9">{value}</span>{" "}
+      <span className="inline-block w-10 text-left text-bs-2xs text-bs-n7">{unit ?? ""}</span>
+    </dd>
+  );
+}
 
 function isCurated(address: string): boolean {
   return BNB_TOKENS.some((t) => t.address.toLowerCase() === address.toLowerCase());
@@ -36,7 +63,7 @@ function sameToken(a: TokenInfo, b: TokenInfo): boolean {
 /** Shown wherever a non-curated token appears. Warning amber, never brand red. */
 function UnverifiedBadge() {
   return (
-    <span className="rounded border border-hl-warning px-1.5 py-0.5 text-[10px] font-semibold text-hl-warning">
+    <span className="border border-bs-warn/50 px-1.5 py-px font-medium text-bs-2xs text-bs-warn">
       {UNVERIFIED_LABEL}
     </span>
   );
@@ -78,10 +105,14 @@ function TokenPicker({ title, tokens, onSelect, onClose, onAddCustom }: TokenPic
   const showResolved = Boolean(resolved) && !alreadyListed;
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-hl-border bg-hl-bg p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-white">{title}</span>
-        <button type="button" onClick={onClose} className="text-xs text-hl-muted hover:text-white">
+    <div className="flex flex-col gap-2.5 border-bs-n4 border-t bg-bs-n2 px-3.5 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold text-bs-base text-bs-n9">{title}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-bs-n7 text-bs-xs transition-colors hover:text-bs-n9"
+        >
           Close
         </button>
       </div>
@@ -90,68 +121,69 @@ function TokenPicker({ title, tokens, onSelect, onClose, onAddCustom }: TokenPic
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search name or symbol, or paste a 0x address"
-        className="rounded border border-hl-border bg-hl-input-bg px-3 py-2 text-sm text-white outline-none"
+        className="border border-bs-n4 bg-bs-n0 px-2.5 py-2 text-bs-n9 text-bs-sm outline-none placeholder:text-bs-n6 focus:border-bs-n5"
       />
 
       {/* ── Curated list ── */}
       {filtered.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-wide text-hl-muted">
+          <span className="font-medium text-bs-2xs text-bs-n7 uppercase tracking-wider">
             Address checked by Basis
           </span>
-          <span className="text-[10px] leading-snug text-hl-muted">
+          <span className="text-bs-2xs text-bs-n7">
             Basis has confirmed these contract addresses are the real ones for these tokens. That is
             all this means. It is not a judgement about whether a token is safe or worth buying.
           </span>
-          {filtered.map((t) => (
-            <button
-              key={t.address}
-              type="button"
-              onClick={() => onSelect(t)}
-              className="flex items-center justify-between rounded px-2 py-2 text-left hover:bg-hl-card"
-            >
-              <span className="flex flex-col">
-                <span className="flex items-center gap-2 text-sm font-semibold text-white">
-                  {t.symbol}
-                  {!isCurated(t.address) && <UnverifiedBadge />}
+          <div className="mt-1 flex flex-col">
+            {filtered.map((t) => (
+              <button
+                key={t.address}
+                type="button"
+                onClick={() => onSelect(t)}
+                className="flex items-center justify-between gap-3 border-bs-n4 border-b px-1 py-2 text-left transition-colors last:border-b-0 hover:bg-bs-n3"
+              >
+                <span className="flex min-w-0 flex-col">
+                  <span className="flex flex-wrap items-center gap-1.5 font-medium text-bs-base text-bs-n9">
+                    {t.symbol}
+                    {!isCurated(t.address) && <UnverifiedBadge />}
+                  </span>
+                  <span className="truncate text-bs-n7 text-bs-xs">{t.name}</span>
                 </span>
-                <span className="text-xs text-hl-muted">{t.name}</span>
-              </span>
-              <span className="font-mono text-[10px] text-hl-muted">
-                {t.address.slice(0, 6)}…{t.address.slice(-4)}
-              </span>
-            </button>
-          ))}
+                <span className="bs-num shrink-0 text-bs-2xs text-bs-n6">
+                  {t.address.slice(0, 6)}…{t.address.slice(-4)}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {/* ── Address lookup ── */}
-      {isLoading && <p className="text-xs text-hl-muted">Looking this token up on BNB Chain…</p>}
-      {error && <p className="text-xs text-hl-red">{error}</p>}
+      {isLoading && <p className="text-bs-n7 text-bs-xs">Looking this token up on BNB Chain…</p>}
+      {error && <p className="text-bs-alarm text-bs-xs">{error}</p>}
 
       {showResolved && resolved && (
-        <div className="flex flex-col gap-2 rounded border border-hl-warning p-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white">{resolved.symbol}</span>
+        <div className="flex flex-col gap-2 border border-bs-warn/50 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-bs-base text-bs-n9">{resolved.symbol}</span>
             <UnverifiedBadge />
           </div>
-          <span className="text-xs text-hl-muted">{resolved.name}</span>
-          <dl className="flex flex-col gap-0.5 text-[11px]">
-            <div className="flex justify-between">
-              <dt className="text-hl-muted">Decimals</dt>
-              <dd className="font-mono text-white">{resolved.decimals}</dd>
+          <span className="text-bs-n7 text-bs-xs">{resolved.name}</span>
+          <dl className="flex flex-col gap-1">
+            <div className={ROW}>
+              <dt className={LABEL}>Decimals</dt>
+              <Figure value={String(resolved.decimals)} />
             </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-hl-muted">Contract</dt>
-              <dd className="truncate font-mono text-white">{resolved.address}</dd>
+            <div className="flex flex-col gap-0.5">
+              <dt className={LABEL}>Contract</dt>
+              <dd className="bs-num break-all text-bs-2xs text-bs-n8">{resolved.address}</dd>
             </div>
           </dl>
           <a
             href={BNB_CHAIN.addressUrl(resolved.address)}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs underline"
-            style={{ color: ACCENT }}
+            className="text-bs-n8 text-bs-xs underline decoration-bs-n6 underline-offset-2 hover:text-bs-n9"
           >
             Check this contract on BscScan before trading
           </a>
@@ -161,7 +193,7 @@ function TokenPicker({ title, tokens, onSelect, onClose, onAddCustom }: TokenPic
               onAddCustom(resolved);
               onSelect(resolved);
             }}
-            className="rounded border border-hl-warning px-3 py-2 text-xs font-semibold text-hl-warning"
+            className="border border-bs-warn/50 px-3 py-2 font-medium text-bs-warn text-bs-xs transition-colors hover:bg-bs-warn/10"
           >
             Use {resolved.symbol} anyway
           </button>
@@ -169,7 +201,7 @@ function TokenPicker({ title, tokens, onSelect, onClose, onAddCustom }: TokenPic
       )}
 
       {!isLoading && !error && !showResolved && filtered.length === 0 && (
-        <p className="text-xs text-hl-muted">
+        <p className="text-bs-n7 text-bs-xs">
           No matches. Paste a token's contract address to add it yourself.
         </p>
       )}
@@ -364,43 +396,50 @@ export default function SwapCard() {
     return null;
   };
 
-  const feeText = (fee: { amount?: string; token?: string } | null): string | null => {
+  const feeParts = (
+    fee: { amount?: string; token?: string } | null,
+  ): { value: string; unit: string } | null => {
     if (!fee?.amount) return null;
     const info = resolveFeeToken(fee.token);
     if (!info) return null;
-    return `${fmt(fee.amount, info.decimals)} ${info.symbol}`;
+    return { value: fmt(fee.amount, info.decimals), unit: info.symbol };
   };
 
-  const basisFeeText = feeText(integratorFee);
-  const zeroExFeeText = feeText(zeroExFee);
+  const basisFee = feeParts(integratorFee);
+  const zeroExFeePart = feeParts(zeroExFee);
 
   const tokenButton = (side: "sell" | "buy", token: TokenInfo) => (
     <button
       type="button"
       onClick={() => setPicker(picker === side ? null : side)}
-      className="flex shrink-0 items-center gap-1 rounded bg-hl-input-bg px-2 py-1 text-sm text-white"
+      className="flex shrink-0 items-center gap-1.5 border border-bs-n4 bg-bs-n2 px-2 py-1.5 font-medium text-bs-base text-bs-n9 transition-colors hover:bg-bs-n3"
     >
       {token.symbol}
-      <span className="text-[10px] text-hl-muted">▾</span>
+      <span className="text-bs-2xs text-bs-n7">▾</span>
     </button>
   );
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-hl-border bg-hl-card p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="font-heading text-lg font-bold text-white">Swap</h2>
-        <span className="text-xs text-hl-muted">via 0x · BNB Chain</span>
+    /* One container. Sections are separated by hairlines rather than by nested
+       boxes, so the card reads as a single instrument instead of a stack of
+       panels. Sharp corners throughout: no gradient, no shadow, no radius. */
+    <section className="border border-bs-n4 bg-bs-n1">
+      <div className="flex items-baseline justify-between gap-3 border-bs-n4 border-b px-3.5 py-2.5">
+        <h2 className="font-semibold text-bs-md text-bs-n9">Swap</h2>
+        <span className="text-bs-n7 text-bs-xs">via 0x · BNB Chain</span>
       </div>
 
-      {/* ── Sell ── */}
-      <div className="flex flex-col gap-2 rounded-md border border-hl-border bg-hl-bg p-3">
-        <div className="flex items-center justify-between text-xs text-hl-muted">
-          <span>You pay</span>
-          <span>
+      {/* ── Input ── */}
+      <div className="px-3.5 pt-3 pb-3">
+        <div className={`${ROW} mb-2`}>
+          <span className={LABEL}>You pay</span>
+          <span className={LABEL}>
             Balance:{" "}
-            {balance !== undefined
-              ? Number(formatUnits(balance, sellToken.decimals)).toFixed(6)
-              : "–"}
+            <span className="bs-num text-bs-n8">
+              {balance !== undefined
+                ? Number(formatUnits(balance, sellToken.decimals)).toFixed(6)
+                : "–"}
+            </span>
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -411,20 +450,19 @@ export default function SwapCard() {
             onChange={(e) => {
               if (/^[0-9]*\.?[0-9]*$/.test(e.target.value)) setAmount(e.target.value);
             }}
-            className="min-w-0 flex-1 bg-transparent font-mono text-2xl text-white outline-none"
+            className="bs-num min-w-0 flex-1 bg-transparent text-bs-n9 text-bs-num outline-none placeholder:text-bs-n6"
           />
           <button
             type="button"
             onClick={handleMax}
-            style={{ color: ACCENT }}
-            className="rounded border border-current px-2 py-1 text-xs font-semibold"
+            className="shrink-0 border border-bs-n4 px-2 py-1.5 font-medium text-bs-2xs text-bs-n7 tracking-wider transition-colors hover:bg-bs-n3 hover:text-bs-n9"
           >
             MAX
           </button>
           {tokenButton("sell", sellToken)}
         </div>
         {!isCurated(sellToken.address) && (
-          <div>
+          <div className="mt-2">
             <UnverifiedBadge />
           </div>
         )}
@@ -440,28 +478,32 @@ export default function SwapCard() {
         />
       )}
 
-      <button
-        type="button"
-        onClick={handleFlip}
-        aria-label="Flip tokens"
-        className="self-center rounded-full border border-hl-border bg-hl-bg px-3 py-1 text-sm text-white"
-      >
-        ↓↑
-      </button>
+      {/* The flip control sits on the rule dividing the two sides, which is
+          what it acts on. */}
+      <div className="relative h-0 border-bs-n4 border-t">
+        <button
+          type="button"
+          onClick={handleFlip}
+          aria-label="Flip tokens"
+          className="-translate-x-1/2 -translate-y-1/2 absolute top-0 left-1/2 border border-bs-n4 bg-bs-n1 px-2 py-1 text-bs-n8 text-bs-xs transition-colors hover:bg-bs-n3 hover:text-bs-n9"
+        >
+          ↓↑
+        </button>
+      </div>
 
-      {/* ── Buy ── */}
-      <div className="flex flex-col gap-2 rounded-md border border-hl-border bg-hl-bg p-3">
-        <div className="flex items-center justify-between text-xs text-hl-muted">
-          <span>You receive (estimated)</span>
+      {/* ── Output ── */}
+      <div className="px-3.5 pt-5 pb-3">
+        <div className="mb-2">
+          <span className={LABEL}>You receive (estimated)</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-mono text-2xl text-white">
+          <span className="bs-num min-w-0 flex-1 truncate text-bs-n9 text-bs-num">
             {isLoading ? "…" : fmt(buyAmount, buyToken.decimals)}
           </span>
           {tokenButton("buy", buyToken)}
         </div>
         {!isCurated(buyToken.address) && (
-          <div>
+          <div className="mt-2">
             <UnverifiedBadge />
           </div>
         )}
@@ -479,22 +521,22 @@ export default function SwapCard() {
 
       {/* ── Transfer-tax warning ── */}
       {taxWarnings.length > 0 && (
-        <div className="flex flex-col gap-1 rounded border border-hl-warning px-3 py-2 text-xs text-hl-warning">
+        <div className="flex flex-col gap-1 border-bs-n4 border-t bg-bs-warn/5 px-3.5 py-2.5 text-bs-warn text-bs-xs">
           <span className="font-semibold">This token takes a cut of every transfer</span>
           {taxWarnings.map((w) => (
             <span key={w}>· {w}</span>
           ))}
-          <span>
+          <span className="text-bs-warn/80">
             You will receive less than the quote shows, and the swap may fail unless slippage covers
             the tax.
           </span>
         </div>
       )}
 
-      {/* ── Slippage ── */}
-      <div className="flex flex-col gap-2">
-        <span className="text-xs text-hl-muted">Max slippage</span>
-        <div className="flex flex-wrap items-center gap-2">
+      {/* ── Settings ── */}
+      <div className="flex flex-col gap-2 border-bs-n4 border-t px-3.5 py-3">
+        <span className={LABEL}>Max slippage</span>
+        <div className="flex flex-wrap items-center gap-1.5">
           {SLIPPAGE_PRESETS.map((bps) => (
             <button
               key={bps}
@@ -503,9 +545,10 @@ export default function SwapCard() {
                 setSlippageBps(bps);
                 setCustomSlippage("");
               }}
-              style={slippageBps === bps ? { backgroundColor: ACCENT } : undefined}
-              className={`rounded px-3 py-1 text-xs font-semibold ${
-                slippageBps === bps ? "text-white" : "border border-hl-border text-hl-text"
+              className={`bs-num border px-2.5 py-1 text-bs-xs transition-colors ${
+                slippageBps === bps
+                  ? "border-bs-n5 bg-bs-n5 text-bs-n9"
+                  : "border-bs-n4 text-bs-n7 hover:bg-bs-n3 hover:text-bs-n9"
               }`}
             >
               {bps / 100}%
@@ -516,12 +559,12 @@ export default function SwapCard() {
             onChange={(e) => applyCustomSlippage(e.target.value)}
             placeholder="Custom"
             inputMode="decimal"
-            className="w-20 rounded border border-hl-border bg-hl-bg px-2 py-1 text-xs text-white outline-none"
+            className="bs-num w-[74px] border border-bs-n4 bg-bs-n0 px-2 py-1 text-bs-n9 text-bs-xs outline-none placeholder:font-ui placeholder:text-bs-n6 focus:border-bs-n5"
           />
-          <span className="text-xs text-hl-muted">%</span>
+          <span className="text-bs-n7 text-bs-xs">%</span>
         </div>
         {slippageBps > HIGH_SLIPPAGE_BPS && (
-          <p className="rounded border border-hl-red px-3 py-2 text-xs font-semibold text-hl-red">
+          <p className="border border-bs-alarm/50 px-2.5 py-2 font-medium text-bs-alarm text-bs-xs">
             ⚠ Slippage is set to {(slippageBps / 100).toFixed(2)}%. You could lose a large share of
             this trade to price movement or sandwich attacks. Only continue if you know why you
             raised it.
@@ -529,63 +572,70 @@ export default function SwapCard() {
         )}
       </div>
 
-      {/* ── Quote detail ── */}
+      {/* ── Quote detail ──
+          A table: one label column, one figure column, every value tabular and
+          right-aligned so decimal points stack. */}
       {buyAmount && !isLoading && (
-        <dl className="flex flex-col gap-1 rounded-md border border-hl-border bg-hl-bg p-3 text-xs">
-          <div className="flex justify-between">
-            <dt className="text-hl-muted">Minimum received</dt>
-            <dd className="font-mono text-white">
-              {fmt(minBuyAmount, buyToken.decimals)} {buyToken.symbol}
-            </dd>
+        <dl className="flex flex-col gap-1.5 border-bs-n4 border-t px-3.5 py-3">
+          <div className={ROW} data-fee-row="minimum-received">
+            <dt className={LABEL}>Minimum received</dt>
+            <Figure value={fmt(minBuyAmount, buyToken.decimals)} unit={buyToken.symbol} />
           </div>
           {priceImpact && (
-            <div className="flex justify-between">
-              <dt className="text-hl-muted">Price impact</dt>
-              <dd className="font-mono text-white">{priceImpact}%</dd>
+            <div className={ROW} data-fee-row="price-impact">
+              <dt className={LABEL}>Price impact</dt>
+              <Figure value={priceImpact} unit="%" />
             </div>
           )}
-          {basisFeeText && (
-            <div className="flex justify-between">
-              <dt className="text-hl-muted">Basis fee</dt>
-              <dd className="text-right text-white">{basisFeeText}</dd>
+          {basisFee && (
+            <div className={ROW} data-fee-row="basis-fee">
+              <dt className={LABEL}>Basis fee</dt>
+              <Figure value={basisFee.value} unit={basisFee.unit} />
             </div>
           )}
-          {zeroExFeeText && (
-            <div className="flex justify-between">
-              <dt className="text-hl-muted">0x protocol fee</dt>
-              <dd className="text-right text-white">{zeroExFeeText}</dd>
+          {zeroExFeePart && (
+            <div className={ROW} data-fee-row="zeroex-fee">
+              <dt className={LABEL}>0x protocol fee</dt>
+              <Figure value={zeroExFeePart.value} unit={zeroExFeePart.unit} />
             </div>
           )}
-          <div className="flex justify-between">
-            <dt className="text-hl-muted">Route</dt>
-            <dd className="text-right text-white">{sources.length ? sources.join(" + ") : "–"}</dd>
+          <div className={ROW} data-fee-row="route">
+            <dt className={LABEL}>Route</dt>
+            {/* Not a figure, so it stays in the interface face. */}
+            <dd className="text-right text-bs-n8 text-bs-sm">
+              {sources.length ? sources.join(" + ") : "–"}
+            </dd>
           </div>
           {estimatedGas && (
-            <div className="flex justify-between">
-              <dt className="text-hl-muted">Estimated gas</dt>
-              <dd className="font-mono text-white">{Number(estimatedGas).toLocaleString()}</dd>
+            <div className={ROW} data-fee-row="estimated-gas">
+              <dt className={LABEL}>Estimated gas</dt>
+              <Figure value={Number(estimatedGas).toLocaleString()} />
             </div>
           )}
         </dl>
       )}
 
       {noLiquidity && (
-        <p className="text-xs text-hl-red">No liquidity available for this pair right now.</p>
+        <p className="border-bs-n4 border-t px-3.5 py-2.5 text-bs-alarm text-bs-xs">
+          No liquidity available for this pair right now.
+        </p>
       )}
-      {quoteError && <p className="text-xs text-hl-red">{quoteError}</p>}
+      {quoteError && (
+        <p className="border-bs-n4 border-t px-3.5 py-2.5 text-bs-alarm text-bs-xs">{quoteError}</p>
+      )}
 
       {/* ── Approve step (before swap, ERC-20 only) ── */}
       {needsApproval && allowanceIssue && (
-        <div className="flex flex-col gap-2 rounded-md border border-hl-border bg-hl-bg p-3">
-          <p className="text-xs text-hl-text">
+        <div className="flex flex-col gap-2 border-bs-n4 border-t px-3.5 py-3">
+          <p className="text-bs-n8 text-bs-xs">
             Before this swap, you need to give the 0x AllowanceHolder contract permission to move{" "}
-            <strong>
+            <strong className="bs-num font-medium text-bs-n9">
               {amount} {sellToken.symbol}
             </strong>{" "}
             from your wallet. We request exactly this amount, not unlimited, so the permission
             cannot be reused after this trade.
           </p>
-          <p className="break-all font-mono text-[10px] text-hl-muted">
+          <p className="bs-num break-all text-bs-2xs text-bs-n6">
             Spender: {allowanceIssue.spender}
           </p>
           <button
@@ -598,8 +648,7 @@ export default function SwapCard() {
                 BigInt(sellAmountBase),
               )
             }
-            style={{ backgroundColor: ACCENT }}
-            className="rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="border border-bs-n5 bg-bs-n2 px-4 py-2 font-medium text-bs-n9 text-bs-sm transition-colors hover:bg-bs-n3 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {status === "awaiting-approval-signature"
               ? "Confirm in wallet…"
@@ -614,75 +663,76 @@ export default function SwapCard() {
           on curation, on a quote, or on an amount being entered. ── */}
       <SafetyPanel address={buyToken.address} />
 
-      {/* ── Swap ── the only part of this card that needs a wallet. ── */}
-      <button
-        type="button"
-        disabled={
-          connectMode
-            ? false
-            : !onBnbChain || busy || needsApproval || !buyAmount || sellAmountBase === "0"
-        }
-        onClick={
-          connectMode
-            ? () => openConnectModal?.()
-            : () =>
-                swap({
-                  sellToken: sellToken.address,
-                  buyToken: buyToken.address,
-                  sellAmount: sellAmountBase,
-                  slippageBps,
-                })
-        }
-        style={{ backgroundColor: ACCENT }}
-        className="rounded-md px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {connectMode
-          ? "Connect wallet"
-          : !onBnbChain
-            ? "Switch to BNB Chain"
-            : status === "quoting"
-              ? "Getting a firm quote…"
-              : status === "awaiting-signature"
-                ? "Confirm in wallet…"
-                : status === "pending"
-                  ? "Swapping…"
-                  : needsApproval
-                    ? `Approve ${sellToken.symbol} first`
-                    : "Swap"}
-      </button>
+      {/* ── Action ── the only part of this card that needs a wallet. ── */}
+      <div className="border-bs-n4 border-t px-3.5 py-3">
+        <button
+          type="button"
+          disabled={
+            connectMode
+              ? false
+              : !onBnbChain || busy || needsApproval || !buyAmount || sellAmountBase === "0"
+          }
+          onClick={
+            connectMode
+              ? () => openConnectModal?.()
+              : () =>
+                  swap({
+                    sellToken: sellToken.address,
+                    buyToken: buyToken.address,
+                    sellAmount: sellAmountBase,
+                    slippageBps,
+                  })
+          }
+          className="w-full bg-bs-brand px-4 py-2.5 font-semibold text-bs-base text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {connectMode
+            ? "Connect wallet"
+            : !onBnbChain
+              ? "Switch to BNB Chain"
+              : status === "quoting"
+                ? "Getting a firm quote…"
+                : status === "awaiting-signature"
+                  ? "Confirm in wallet…"
+                  : status === "pending"
+                    ? "Swapping…"
+                    : needsApproval
+                      ? `Approve ${sellToken.symbol} first`
+                      : "Swap"}
+        </button>
 
-      {/* ── Result ── */}
-      {status === "rejected" && (
-        <p className="text-xs text-hl-muted">{execError} No transaction was sent.</p>
-      )}
-      {status === "failed" && (
-        <p className="text-xs text-hl-red">
-          {execError}{" "}
-          {swapHash && (
+        {/* ── Result ── */}
+        {status === "rejected" && (
+          <p className="mt-2 text-bs-n7 text-bs-xs">{execError} No transaction was sent.</p>
+        )}
+        {status === "failed" && (
+          <p className="mt-2 text-bs-alarm text-bs-xs">
+            {execError}{" "}
+            {swapHash && (
+              <a
+                href={BNB_CHAIN.txUrl(swapHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                View on BscScan
+              </a>
+            )}
+          </p>
+        )}
+        {status === "success" && swapHash && (
+          <p className="mt-2 text-bs-success text-bs-xs">
+            Swap confirmed.{" "}
             <a
               href={BNB_CHAIN.txUrl(swapHash)}
               target="_blank"
               rel="noopener noreferrer"
-              className="underline"
+              className="underline underline-offset-2"
             >
               View on BscScan
             </a>
-          )}
-        </p>
-      )}
-      {status === "success" && swapHash && (
-        <p className="text-xs" style={{ color: ACCENT }}>
-          Swap confirmed.{" "}
-          <a
-            href={BNB_CHAIN.txUrl(swapHash)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline"
-          >
-            View on BscScan
-          </a>
-        </p>
-      )}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

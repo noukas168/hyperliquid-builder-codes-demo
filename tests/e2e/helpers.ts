@@ -172,16 +172,21 @@ export async function forbidLiveCalls(page: Page): Promise<void> {
 }
 
 /**
- * Load the app.
+ * Load the app and wait for it to become interactive.
  *
- * `domcontentloaded` rather than the default `load`. The root layout pulls a
- * render-blocking stylesheet from fonts.googleapis.com, and on a machine that
- * cannot reach it the load event never fires, so every navigation times out for
- * a reason that has nothing to do with the test. The page is client-rendered
- * and every assertion auto-waits, so nothing here needs the load event.
+ * The wait is the important half. The amount field is a controlled input, so a
+ * fill() that lands before React mounts is discarded the moment it does: the
+ * DOM shows the typed value, component state never receives it, and the quote
+ * never fires. That failure looks exactly like a broken quote and is not one.
+ *
+ * The wallet button is rendered only on the client and is absent from the
+ * server HTML, which makes its appearance a reliable signal that React has
+ * taken over. Note the capital W: this is the wallet chrome in the header, not
+ * the card's own "Connect wallet" action.
  */
 export async function visit(page: Page): Promise<void> {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Connect Wallet", exact: true }).waitFor();
 }
 
 /**
@@ -211,14 +216,17 @@ export function safetyPanel(page: Page): Locator {
 }
 
 /**
- * The status word ("Serious problem", "Take care") sits beside its label inside
- * the same wrapper span, so this walks up two levels from the label to the
- * element holding both. Tied to the panel's markup on purpose: if the row
- * structure changes, a status assertion should fail loudly rather than silently
- * start matching text from a different row.
+ * A single check row, addressed by the check id it carries. The panel tags each
+ * row with data-check-row so a row can be located without depending on the
+ * arrangement of spans inside it, which a design pass is free to change.
  */
-export function verdictRow(page: Page, label: string): Locator {
-  return safetyPanel(page).getByText(label, { exact: true }).locator("xpath=../..");
+export function verdictRow(page: Page, id: CheckId): Locator {
+  return safetyPanel(page).locator(`[data-check-row="${id}"]`);
+}
+
+/** A labelled figure in the swap card's quote breakdown. */
+export function breakdownRow(page: Page, row: string): Locator {
+  return page.locator(`[data-fee-row="${row}"]`);
 }
 
 /** Amount box on the sell side. */

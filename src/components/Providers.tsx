@@ -20,9 +20,20 @@ export default function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
+          /**
+           * Neutral, not coloured. This theme paints the connect button and the
+           * account chip, which is where the wallet address is rendered. A
+           * semantic colour there would give that colour a second meaning: the
+           * green previously used here is the success colour, and an address is
+           * not a success. The brand red is equally wrong, since it belongs to
+           * the mark and the primary action alone.
+           *
+           * Shared with the Hyperliquid wizard, which picks up the same neutral
+           * treatment.
+           */
           theme={darkTheme({
-            accentColor: "#52B196",
-            accentColorForeground: "#FFFFFF",
+            accentColor: "#1E2227",
+            accentColorForeground: "#E8EBEF",
             borderRadius: "medium",
           })}
         >

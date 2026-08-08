@@ -168,6 +168,42 @@ the defect it claims to catch before trusting it. Two of these were checked that
 way: removing the settle delay breaks the debounce test, and removing the
 render-time address guard breaks the stale-verdict test.
 
+## Interface design
+
+Basis has its own token layer, `--bs-*` in `globals.css`, exposed to Tailwind as
+the `bs` colour namespace and the `text-bs-*` type scale. It is deliberately
+separate from the `hl-*` tokens, which are shared with the Hyperliquid wizard:
+redefining those restyles `/hyperliquid` as a side effect.
+
+**Every colour means exactly one thing.**
+
+- **Brand** `#E23A2E` is the identity layer only: the mark, the primary action,
+  the rule across the top of the page. It never touches a price, a balance, an
+  address or a status. A brand colour carrying data makes the loudest signal in
+  the interface meaningless.
+- **Success** `#2FBF71` is a positive verdict, and nothing else. It is not a
+  confirmation colour for wallet chrome.
+- **Alarm** `#FF2D55` is a negative verdict. It is a hotter, pinker red than the
+  brand brick on purpose, so the two never read as the same signal.
+- **Warning** `#F0A21A` is a qualified verdict.
+- **Uncertainty has no colour.** Unknown and could-not-check states use the
+  neutral ramp. Tinting them would present an absence of a verdict as a verdict,
+  which is the same mistake as a grey row reading as a pass.
+
+Neutrals come from one ordered ramp, `--bs-n0` through `--bs-n9`, so two greys
+are either the same decision or visibly different ones. Never introduce a
+one-off grey.
+
+**Figures are the product.** Every numeral renders in the monospace face with
+tabular figures, via the `.bs-num` class. Numbers are brighter and larger than
+the labels beside them; labels sit a step down in both size and neutral. Where
+figures stack, the numeral is right-aligned and its unit sits in its own
+fixed-width column, so decimal points line up down the table rather than being
+pushed around by the length of the unit.
+
+Density over decoration: no gradients, no shadows, no radii. Hairline borders
+and spacing do the separating, not boxes nested inside boxes.
+
 ## Commit messages
 
 Follow the shape the history already uses:

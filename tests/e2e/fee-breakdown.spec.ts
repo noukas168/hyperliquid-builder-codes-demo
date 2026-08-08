@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   amountInput,
+  breakdownRow,
   forbidLiveCalls,
   priceBody,
   SENTINEL,
@@ -13,14 +14,6 @@ import {
 
 const BASIS_FEE = { amount: "1000000000000000", token: SENTINEL, type: "volume" };
 const ZEROEX_FEE = { amount: "150000000000000000", token: TOKENS.USDT.address, type: "volume" };
-
-/** The row div holding a labelled figure in the quote breakdown. */
-function breakdownRow(page: import("@playwright/test").Page, label: string) {
-  return page
-    .locator("div")
-    .filter({ hasText: new RegExp(`^${label}`) })
-    .first();
-}
 
 /**
  * Regression cover for 447cb1a. Both fees come straight from the live quote and
@@ -42,8 +35,8 @@ test.describe("quote fee breakdown", () => {
 
     // The Basis fee is on the sell side, the 0x fee on the buy side. Each is
     // labelled in its own token, which is the part that used to be wrong.
-    await expect(breakdownRow(page, "Basis fee")).toContainText("0.001000 BNB");
-    await expect(breakdownRow(page, "0x protocol fee")).toContainText("0.150000 USDT");
+    await expect(breakdownRow(page, "basis-fee")).toContainText("0.001000 BNB");
+    await expect(breakdownRow(page, "zeroex-fee")).toContainText("0.150000 USDT");
   });
 
   test("omits a fee denominated in neither side of the trade", async ({ page }) => {
@@ -64,7 +57,7 @@ test.describe("quote fee breakdown", () => {
     await amountInput(page).fill("1");
     await expect(page.getByText("600.000000", { exact: true })).toBeVisible();
 
-    await expect(breakdownRow(page, "Basis fee")).toContainText("0.001000 BNB");
+    await expect(breakdownRow(page, "basis-fee")).toContainText("0.001000 BNB");
     // Printing it against the sell token's decimals would be a wrong number, so
     // the line goes away entirely.
     await expect(page.getByText("0x protocol fee")).toHaveCount(0);
