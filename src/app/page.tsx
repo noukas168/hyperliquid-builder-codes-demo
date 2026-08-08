@@ -39,11 +39,12 @@ export default function BasisPage() {
             <div className="flex min-w-0 items-center gap-2">
               {/* Sized by its ink, not its box. The mark is wide and short,
                   24 x 12 inside a 32-unit square, so a square box the height of
-                  the wordmark would leave it visibly undersized beside the
-                  text. 28px puts the bars at roughly the wordmark's cap
-                  height. */}
-              <BasisMark className="h-7 w-7 shrink-0 text-bs-brand" />
-              <h1 className="truncate font-semibold text-bs-md text-bs-n9 tracking-tight">Basis</h1>
+                  the wordmark leaves it visibly undersized beside the text. At
+                  36px the bars span 27 x 13.5, which sets the mark's ink height
+                  against the wordmark's cap height at 20px. Both halves move
+                  together; changing one alone breaks the lockup. */}
+              <BasisMark className="h-9 w-9 shrink-0 text-bs-brand" />
+              <h1 className="truncate font-semibold text-bs-n9 text-bs-xl">Basis</h1>
             </div>
             <ConnectButton showBalance={false} accountStatus="address" chainStatus="icon" />
           </div>

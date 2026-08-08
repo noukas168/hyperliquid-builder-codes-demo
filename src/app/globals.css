@@ -178,9 +178,21 @@ samp {
   --bs-alarm: #ff2d55;
   --bs-warn: #f0a21a;
 
-  /* Focus is neutral and bright: visible against every surface, and not
-     confusable with any semantic colour. */
-  --bs-focus: #e8ebef;
+  /**
+   * Focus.
+   *
+   * A step on the neutral ramp rather than near-white. The white ring this
+   * replaces read as a browser default dropped onto a dark surface: it was the
+   * brightest thing on the page, and on the amount field, which is wide and
+   * borderless, it drew a hard rectangle across half the card.
+   *
+   * Neutral by necessity, not only by taste. Success, alarm and warning each
+   * already mean exactly one thing, and focus is not a verdict, so it cannot
+   * borrow any of them. It clears the 3:1 that WCAG 2.2 asks of a non-text
+   * indicator against every surface a focusable control sits on: 6.3:1 against
+   * --bs-n0, 6.0:1 against --bs-n1, 5.6:1 against --bs-n2.
+   */
+  --bs-focus: #8a929d;
 
   /* ── Type ──
      Interface text and numerals are different typefaces on purpose: figures

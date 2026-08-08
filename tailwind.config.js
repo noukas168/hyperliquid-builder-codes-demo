@@ -37,6 +37,8 @@ module.exports = {
         "bs-base": ["13px", { lineHeight: "20px" }],
         "bs-md": ["15px", { lineHeight: "22px" }],
         "bs-lg": ["17px", { lineHeight: "24px", letterSpacing: "-0.01em" }],
+        // Header wordmark. The only interface text above the section scale.
+        "bs-xl": ["20px", { lineHeight: "26px", letterSpacing: "-0.02em" }],
         /**
          * Display steps, for figures only. The amounts being traded are the
          * subject of the card, so they sit two steps above everything else on

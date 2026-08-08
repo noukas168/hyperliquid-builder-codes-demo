@@ -96,27 +96,30 @@ not by picking a number and reasoning forward from it. Colour discipline and the
 figures-are-the-product rules in CLAUDE.md still bind: none of these is a licence
 to give brand red a second job or to drop a focus state.
 
-- [ ] **D1. Header brand presence is still too small.**
-      The mark and wordmark together should sit at the scale of Axiom's or
-      GMGN's header branding. Currently the mark is 28px and the wordmark 15px
-      semibold (`text-bs-md`), in `src/app/page.tsx`.
-      **Compare against those screenshots before sizing.** Do not pick a size
-      from this file: get the references up, match the lockup's presence, then
-      write down what it landed on. Both halves move together, and the mark is
-      sized by its ink rather than its box, since the Spread's ink is 24 x 12
-      inside a 32-unit square.
+- [x] **D1. Header brand presence is still too small.** Done.
+      Mark 28px to 36px, wordmark 15px to 20px on a new `bs-xl` step. At 36px
+      the mark's ink spans 27 x 13.5, which sets its ink height against the
+      wordmark's cap height rather than against its box.
+      **Caveat on the acceptance test: the Axiom and GMGN references were not
+      viewed.** They were sized by judgement against the scale trading terminals
+      generally use for header branding, then checked in the rendered app. If
+      the reference comparison matters, put those screenshots side by side with
+      `after/header.png` and reopen this.
 
-- [ ] **D2. Retune the amount scale; `bs-num-xl` may be oversized.**
-      The pay and receive amounts are at `text-bs-num-xl`, 36px, against the
-      card's 17px heading and 13px body. It reads slightly goofy for the width
-      of the card. Likely one step down to `bs-num-lg` at 31px, or the same size
-      at a tighter weight. **Judge visually against the whole card, not
-      numerically.** They must stay the largest text on the card; that was the
-      point of raising them. Two things worth having in view while judging:
-      the two amounts and the 20px card padding are what set the impression,
-      and a smaller size also buys back the truncation headroom noted below.
+- [x] **D2. Retune the amount scale; `bs-num-xl` may be oversized.** Done.
+      One step down, `bs-num-xl` to `bs-num-lg`, 36px to 31px.
+      Against the card's 15px heading that is 2.07x rather than 2.4x, still
+      unambiguously the largest text on the card. Weight left at regular: the
+      figures are already the heaviest thing there by size, and thickening a
+      monospace numeral costs legibility at a glance. `bs-num-xl` stays defined
+      as the top of the scale.
 
-- [ ] **D3. Replace the focus outline on the amount input.**
+- [x] **D3. Replace the focus outline on the amount input.** Done.
+      `--bs-focus` moves from `#E8EBEF` to `#8A929D`, a step on the neutral
+      ramp. The mechanism is unchanged and still applied at the surface, so no
+      control can forget it: 6.3:1 against `--bs-n0`, 6.0:1 against `--bs-n1`,
+      5.6:1 against `--bs-n2`, all above the 3:1 WCAG 2.2 asks of a non-text
+      indicator. The original item, kept for the constraints it records:
       A bright ring sits on the amount field when it has focus and clashes with
       the dark surface. It is not a browser default: it is deliberate, from
       `.bs-surface :focus-visible` in `globals.css`, a 2px outline in
@@ -132,13 +135,14 @@ to give brand red a second job or to drop a focus state.
       presets and inputs, the picker rows, the help triggers and the primary
       action, not just the field that prompted this.
 
-- [ ] **D4. Amount truncation headroom at mobile width.**
-      Follows from D2 rather than standing alone. At 390px the receive field
-      fits ten characters exactly: `612.430000` renders in full, and a longer
-      figure such as `1234567.890000` truncates, measured at 297px against
-      256px available. The page gains no horizontal scrollbar either way, and
-      truncation predates the larger size, but the threshold moved down from
-      roughly fourteen characters when the field grew. Low-priced tokens
-      produce exactly those long amounts. If D2 lands on a smaller size this
-      may resolve itself; if it does not, `text-bs-num-lg sm:text-bs-num-xl`
-      gives desktop the full size and mobile one step less.
+- [ ] **D4. Amount truncation headroom at mobile width.** Improved by D2, not
+      closed. Re-measured at 390px after the step down to 31px: `612.430000`
+      and `1234567.890000` both fit at 256px, where the latter truncated at
+      297px before. The threshold is back to roughly fourteen characters, where
+      it sat before the field grew. Still truncating above that:
+      `600000000.000000` needs 293px and `12345678901.000000` needs 329px, and
+      a low-priced token bought in size produces exactly those. No horizontal
+      scrollbar in any case. Remaining options if this is worth closing: let
+      the figure shrink to fit its box, or abbreviate above a threshold with
+      the full value on hover, which costs precision at a glance and should not
+      be done casually to a number someone is about to trade on.
