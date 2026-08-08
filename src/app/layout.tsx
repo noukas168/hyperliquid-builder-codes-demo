@@ -16,7 +16,7 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Basis — trading terminal on Hyperliquid",
+  title: "Basis: trading terminal on Hyperliquid",
   description: "Non-custodial trading terminal on Hyperliquid.",
 };
 

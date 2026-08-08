@@ -1,5 +1,6 @@
 "use client";
 
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
@@ -179,6 +180,7 @@ function TokenPicker({ title, tokens, onSelect, onClose, onAddCustom }: TokenPic
 export default function SwapCard() {
   const { address, isConnected, chainId } = useAccount();
   const queryClient = useQueryClient();
+  const { openConnectModal } = useConnectModal();
   const [sellToken, setSellToken] = useState<TokenInfo>(DEFAULT_SELL_TOKEN);
   const [buyToken, setBuyToken] = useState<TokenInfo>(DEFAULT_BUY_TOKEN);
   const [amount, setAmount] = useState("");
@@ -189,6 +191,13 @@ export default function SwapCard() {
   const [picker, setPicker] = useState<"sell" | "buy" | null>(null);
 
   const onBnbChain = isConnected && chainId === BNB_CHAIN.chainId;
+
+  /**
+   * With no wallet the card is a working read-only preview: tokens, quotes,
+   * fees and safety checks all resolve. Only the final button changes job, so
+   * nothing moves on the page when a wallet connects.
+   */
+  const connectMode = !isConnected;
 
   const allTokens = useMemo(() => [...BNB_TOKENS, ...customTokens], [customTokens]);
 
@@ -249,7 +258,12 @@ export default function SwapCard() {
     sellAmount: sellAmountBase,
     taker: address,
     slippageBps,
-    enabled: onBnbChain,
+    // Quotes are read-only, so a visitor without a wallet still gets live
+    // prices and the fee breakdown. 0x only needs a taker for a firm quote,
+    // which is fetched separately at swap time. A connected wallet on the
+    // wrong chain is the one case worth suppressing: the numbers would not
+    // be actionable and the button already says to switch.
+    enabled: !isConnected || onBnbChain,
   });
 
   const {
@@ -336,7 +350,7 @@ export default function SwapCard() {
     if (Number.isFinite(pct) && pct > 0 && pct <= 100) setSlippageBps(Math.round(pct * 100));
   };
 
-  const fmt = (v?: string, d = 18) => (v ? Number(formatUnits(BigInt(v), d)).toFixed(6) : "—");
+  const fmt = (v?: string, d = 18) => (v ? Number(formatUnits(BigInt(v), d)).toFixed(6) : "–");
 
   // Fee lines come straight from the live quote, never from a hardcoded rate.
   // A fee can be denominated in either side of the trade, so resolve the fee
@@ -386,7 +400,7 @@ export default function SwapCard() {
             Balance:{" "}
             {balance !== undefined
               ? Number(formatUnits(balance, sellToken.decimals)).toFixed(6)
-              : "—"}
+              : "–"}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -544,7 +558,7 @@ export default function SwapCard() {
           )}
           <div className="flex justify-between">
             <dt className="text-hl-muted">Route</dt>
-            <dd className="text-right text-white">{sources.length ? sources.join(" + ") : "—"}</dd>
+            <dd className="text-right text-white">{sources.length ? sources.join(" + ") : "–"}</dd>
           </div>
           {estimatedGas && (
             <div className="flex justify-between">
@@ -568,7 +582,7 @@ export default function SwapCard() {
             <strong>
               {amount} {sellToken.symbol}
             </strong>{" "}
-            from your wallet. We request exactly this amount — not unlimited — so the permission
+            from your wallet. We request exactly this amount, not unlimited, so the permission
             cannot be reused after this trade.
           </p>
           <p className="break-all font-mono text-[10px] text-hl-muted">
@@ -600,23 +614,30 @@ export default function SwapCard() {
           on curation, on a quote, or on an amount being entered. ── */}
       <SafetyPanel address={buyToken.address} />
 
-      {/* ── Swap ── */}
+      {/* ── Swap ── the only part of this card that needs a wallet. ── */}
       <button
         type="button"
-        disabled={!onBnbChain || busy || needsApproval || !buyAmount || sellAmountBase === "0"}
-        onClick={() =>
-          swap({
-            sellToken: sellToken.address,
-            buyToken: buyToken.address,
-            sellAmount: sellAmountBase,
-            slippageBps,
-          })
+        disabled={
+          connectMode
+            ? false
+            : !onBnbChain || busy || needsApproval || !buyAmount || sellAmountBase === "0"
+        }
+        onClick={
+          connectMode
+            ? () => openConnectModal?.()
+            : () =>
+                swap({
+                  sellToken: sellToken.address,
+                  buyToken: buyToken.address,
+                  sellAmount: sellAmountBase,
+                  slippageBps,
+                })
         }
         style={{ backgroundColor: ACCENT }}
         className="rounded-md px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {!isConnected
-          ? "Connect a wallet"
+        {connectMode
+          ? "Connect wallet"
           : !onBnbChain
             ? "Switch to BNB Chain"
             : status === "quoting"

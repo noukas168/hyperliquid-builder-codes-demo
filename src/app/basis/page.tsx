@@ -1,34 +1,28 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useBalance, useSwitchChain } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import SwapCard from "@/components/SwapCard";
 import { BNB_CHAIN } from "@/config/chains";
 
 const ACCENT = "#E5341F";
 
 export default function BasisPage() {
-  const { address, isConnected, chainId } = useAccount();
+  const { isConnected, chainId } = useAccount();
   const { switchChain, isPending: isSwitching, error: switchError } = useSwitchChain();
 
-  const onBnbChain = isConnected && chainId === BNB_CHAIN.chainId;
-
-  const { data: balance, isLoading: balanceLoading } = useBalance({
-    address,
-    chainId: BNB_CHAIN.chainId,
-    query: { enabled: Boolean(address) && onBnbChain },
-  });
+  // Only ever true for a connected wallet, so nothing appears or disappears
+  // on the path from no wallet to a wallet on the right chain.
+  const wrongNetwork = isConnected && chainId !== BNB_CHAIN.chainId;
 
   return (
     <main className="min-h-screen bg-hl-bg px-6 py-16 font-body text-hl-text">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-8">
         <header className="flex flex-col gap-2">
-          <h1 className="font-heading text-3xl font-bold text-white">
-            Basis <span style={{ color: ACCENT }}>·</span> {BNB_CHAIN.label}
-          </h1>
+          <h1 className="font-heading text-3xl font-bold text-white">Basis</h1>
           <p className="text-sm text-hl-muted">
-            Connect a wallet on {BNB_CHAIN.label} (chain {BNB_CHAIN.chainId}) to view your{" "}
-            {BNB_CHAIN.nativeSymbol} balance.
+            Non-custodial spot trading on {BNB_CHAIN.label}. Safety checks on every token, shown
+            before you trade.
           </p>
         </header>
 
@@ -36,15 +30,11 @@ export default function BasisPage() {
           <ConnectButton />
         </div>
 
-        {!isConnected && (
-          <p className="rounded-lg border border-hl-border bg-hl-card px-4 py-3 text-sm text-hl-muted">
-            No wallet connected.
-          </p>
-        )}
-
-        {isConnected && !onBnbChain && (
+        {wrongNetwork && (
           <div className="flex flex-col gap-3 rounded-lg border border-hl-border bg-hl-card px-4 py-4">
-            <p className="text-sm">Wrong network — connected to chain {chainId ?? "unknown"}.</p>
+            <p className="text-sm">
+              Wrong network. This wallet is on chain {chainId ?? "unknown"}.
+            </p>
             <button
               type="button"
               onClick={() => switchChain({ chainId: BNB_CHAIN.chainId })}
@@ -58,36 +48,9 @@ export default function BasisPage() {
           </div>
         )}
 
-        {onBnbChain && address && (
-          <dl className="flex flex-col divide-y divide-hl-border rounded-lg border border-hl-border bg-hl-card">
-            <div className="flex flex-col gap-1 px-4 py-4">
-              <dt className="text-xs uppercase tracking-wide text-hl-muted">Address</dt>
-              <dd>
-                <a
-                  href={BNB_CHAIN.addressUrl(address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: ACCENT }}
-                  className="break-all font-mono text-sm hover:underline"
-                >
-                  {address}
-                </a>
-              </dd>
-            </div>
-            <div className="flex flex-col gap-1 px-4 py-4">
-              <dt className="text-xs uppercase tracking-wide text-hl-muted">Balance</dt>
-              <dd className="font-mono text-2xl font-bold text-white">
-                {balanceLoading
-                  ? "…"
-                  : balance
-                    ? `${Number(balance.formatted).toFixed(6)} ${balance.symbol}`
-                    : `— ${BNB_CHAIN.nativeSymbol}`}
-              </dd>
-            </div>
-          </dl>
-        )}
-
-        {onBnbChain && <SwapCard />}
+        {/* No wallet gate. The card is fully usable read-only; only its final
+            button needs an account. */}
+        <SwapCard />
       </div>
     </main>
   );

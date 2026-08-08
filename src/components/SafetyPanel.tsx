@@ -413,7 +413,7 @@ export default function SafetyPanel({ address }: { address: Address }) {
           <h3 className="text-sm font-semibold text-white">Safety checks</h3>
           <p className="text-[11px] leading-snug text-hl-muted">
             {BNB_CHAIN.nativeSymbol} is the native coin of {BNB_CHAIN.label}, not a token contract.
-            These checks look for things only a contract can do — mint new supply, charge a transfer
+            These checks look for things only a contract can do: mint new supply, charge a transfer
             tax, pause trading, hold liquidity that can be pulled. There is no contract here to do
             any of them, so there is nothing to check.
           </p>
@@ -437,7 +437,7 @@ export default function SafetyPanel({ address }: { address: Address }) {
         </p>
         {throttled ? (
           <p className="text-[11px] font-semibold text-hl-warning">
-            These checks are temporarily throttled — too many security lookups were made in a short
+            These checks are temporarily throttled. Too many security lookups were made in a short
             time.{" "}
             {pending
               ? // Still retrying: the rows below say "checking", so promising
