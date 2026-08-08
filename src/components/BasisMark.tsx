@@ -1,5 +1,6 @@
 /**
- * The Basis mark: three columns of ascending height on a shared baseline.
+ * The Basis mark: two horizontal bars, offset across and down, with the gap
+ * between them stepping diagonally. The gap is the mark.
  *
  * Inlined rather than loaded from /brand/mark.svg because an <img> renders in
  * its own document and cannot inherit currentColor, which is the whole point of
@@ -23,9 +24,8 @@ export default function BasisMark({ className, label }: { className?: string; la
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <rect x="4" y="16" width="6" height="12" />
-      <rect x="13" y="10" width="6" height="18" />
-      <rect x="22" y="4" width="6" height="24" />
+      <rect x="4" y="10" width="20" height="4" rx="1" />
+      <rect x="8" y="18" width="20" height="4" rx="1" />
     </svg>
   );
 }

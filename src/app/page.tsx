@@ -37,7 +37,12 @@ export default function BasisPage() {
                 interface face and in a neutral, because a wordmark is
                 identity, not signal. */}
             <div className="flex min-w-0 items-center gap-2">
-              <BasisMark className="h-5 w-5 shrink-0 text-bs-brand" />
+              {/* Sized by its ink, not its box. The mark is wide and short,
+                  24 x 12 inside a 32-unit square, so a square box the height of
+                  the wordmark would leave it visibly undersized beside the
+                  text. 28px puts the bars at roughly the wordmark's cap
+                  height. */}
+              <BasisMark className="h-7 w-7 shrink-0 text-bs-brand" />
               <h1 className="truncate font-semibold text-bs-md text-bs-n9 tracking-tight">Basis</h1>
             </div>
             <ConnectButton showBalance={false} accountStatus="address" chainStatus="icon" />

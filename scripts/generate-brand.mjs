@@ -23,27 +23,37 @@ const BRAND = "#D6362B";
 const GROUND = "#0A0B0D";
 
 /**
- * The Staircase mark, on a 32-unit grid.
+ * The Spread mark, on a 32-unit grid.
  *
- * Three columns of equal width on a shared baseline at y=28, rising left to
- * right in equal steps. Widths and gaps are whole units so the mark stays crisp
- * when it lands on a pixel grid at small sizes.
+ * Two horizontal rounded bars of equal size, offset both across and down, so
+ * the negative space between them steps diagonally. The gap is the mark: it is
+ * sized to survive a 16px favicon rather than to look best at 512px.
  *
- *   column width 6, gap 3, ink spans x 4..28
- *   heights 12, 18, 24, a 1 : 1.5 : 2 progression
- *   ink spans y 4..28, so the mark is square and optically centred
+ *   bar 20 x 4, corner radius 1
+ *   upper bar at x=4, lower at x=8, a 4-unit offset, 0.2 of the bar width
+ *   bars at y=10 and y=18, leaving a 4-unit gap
+ *   ink spans x 4..28 and y 10..22, centred on the 32-unit canvas
+ *
+ * Every coordinate is even. A 32-unit grid halves to 16px, so even units land
+ * on whole pixels and the bar edges stay hard at favicon size; the gap renders
+ * a clean 2px there. The reference geometry, 140 x 28 at radius 6 on a 256
+ * canvas, maps to 17.5 x 3.5 at radius 0.75 here, which would put every edge on
+ * a half pixel. The proportions below keep its 0.2 offset-to-width ratio and
+ * its roughly quarter-height corner radius while snapping to the grid.
  */
-const COLUMNS = [
-  { x: 4, w: 6, h: 12 },
-  { x: 13, w: 6, h: 18 },
-  { x: 22, w: 6, h: 24 },
+const BARS = [
+  { x: 4, y: 10 },
+  { x: 8, y: 18 },
 ];
-const BASELINE = 28;
+const BAR_W = 20;
+const BAR_H = 4;
+const BAR_R = 1;
 const GRID = 32;
 
 const rects = (indent) =>
-  COLUMNS.map(
-    ({ x, w, h }) => `${indent}<rect x="${x}" y="${BASELINE - h}" width="${w}" height="${h}" />`,
+  BARS.map(
+    ({ x, y }) =>
+      `${indent}<rect x="${x}" y="${y}" width="${BAR_W}" height="${BAR_H}" rx="${BAR_R}" />`,
   ).join("\n");
 
 /**
@@ -75,20 +85,38 @@ ${rects("  ")}
 `;
 
 // ── icon.svg ──────────────────────────────────────────────────────────────
-// The app icon: the mark in brand red on a near-black squircle. The mark's
-// 32-unit grid is scaled 10x to 320px and centred in 512px, leaving the ink
-// spanning 136..376 with even margins.
+/**
+ * The app icon: the mark in brand red on a near-black squircle.
+ *
+ * `scale` sets how much of the 512 canvas the mark's 32-unit grid covers, and
+ * it is not one value for every size. Optical sizing: a large icon wants air
+ * around the mark, a 16px favicon wants none, and more than that, a favicon
+ * wants its edges on whole pixels.
+ *
+ * Rendering 512 down to 16 divides by 32, so a mark unit becomes scale/32 of a
+ * pixel. At scale 10 a 4-unit bar lands on 1.25px, which is why the bars and
+ * the gap between them go soft: the grid's even units buy nothing once the
+ * icon is scaled by a non-multiple. Only a scale that is a multiple of 16
+ * keeps even units on whole pixels, and 16 is the one that also leaves the
+ * mark's own 4-unit inset as the icon's margin.
+ */
 const ICON = 512;
-const SCALE = 10;
-const OFFSET = (ICON - GRID * SCALE) / 2;
-const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ICON} ${ICON}" role="img" aria-labelledby="basis-icon-title">
+const DISPLAY_SCALE = 10; // large sizes: mark covers 320 of 512, with air
+const FAVICON_SCALE = 16; // 16px rasters: 4-unit bar lands on exactly 2px
+
+function iconSvgAt(scale) {
+  const offset = (ICON - GRID * scale) / 2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ICON} ${ICON}" role="img" aria-labelledby="basis-icon-title">
   <title id="basis-icon-title">Basis</title>
   <path d="${squirclePath(ICON)}" fill="${GROUND}" />
-  <g transform="translate(${OFFSET} ${OFFSET}) scale(${SCALE})" fill="${BRAND}">
+  <g transform="translate(${offset} ${offset}) scale(${scale})" fill="${BRAND}">
 ${rects("    ")}
   </g>
 </svg>
 `;
+}
+
+const iconSvg = iconSvgAt(DISPLAY_SCALE);
 
 mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, "mark.svg"), markSvg);
@@ -101,11 +129,11 @@ console.log("wrote mark.svg, icon.svg");
  * Apple applies its own mask to a touch icon, so a transparent corner there
  * would be masked twice and show through; a favicon wants the corners clear.
  */
-async function render(page, size, opaque) {
+async function render(page, size, opaque, svg = iconSvg) {
   await page.setViewportSize({ width: size, height: size });
   await page.setContent(
     `<html><body style="margin:0;background:${opaque ? GROUND : "transparent"}">
-       <div style="width:${size}px;height:${size}px">${iconSvg}</div>
+       <div style="width:${size}px;height:${size}px">${svg}</div>
      </body></html>`,
   );
   return page.screenshot({ omitBackground: !opaque });
@@ -143,13 +171,19 @@ function buildIco(images) {
 const browser = await chromium.launch();
 const page = await browser.newPage();
 
+const faviconSvg = iconSvgAt(FAVICON_SCALE);
 const icoSizes = [16, 32, 48];
 const icoImages = [];
 for (const size of icoSizes) {
-  icoImages.push({ size, png: await render(page, size, false) });
+  icoImages.push({ size, png: await render(page, size, false, faviconSvg) });
 }
-writeFileSync(join(OUT, "favicon.ico"), buildIco(icoImages));
-console.log(`wrote favicon.ico (${icoSizes.join(", ")}px)`);
+const ico = buildIco(icoImages);
+writeFileSync(join(OUT, "favicon.ico"), ico);
+// Also at the web root. The metadata link is what browsers follow, but
+// crawlers and feed readers still request /favicon.ico directly, and without
+// this that request 404s.
+writeFileSync(join(ROOT, "public", "favicon.ico"), ico);
+console.log(`wrote favicon.ico and /favicon.ico (${icoSizes.join(", ")}px)`);
 
 writeFileSync(join(OUT, "apple-touch-icon.png"), await render(page, 180, true));
 console.log("wrote apple-touch-icon.png (180px)");
