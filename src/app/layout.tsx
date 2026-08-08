@@ -16,9 +16,11 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  // Applies to / and anything without its own metadata. /basis overrides it.
-  title: "Basis, trading terminal on Hyperliquid",
-  description: "Non-custodial trading terminal on Hyperliquid.",
+  // Basis is the root route, so this is its metadata as well as the default
+  // for anything without its own. /hyperliquid overrides it.
+  title: "Basis, non-custodial spot trading on BNB Chain",
+  description:
+    "Non-custodial spot trading on BNB Chain. Safety checks on every token, shown before you trade.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
