@@ -38,6 +38,21 @@ export const metadata: Metadata = {
   title: "Basis, non-custodial spot trading on BNB Chain",
   description:
     "Non-custodial spot trading on BNB Chain. Safety checks on every token, shown before you trade.",
+  /**
+   * Declared on the root layout, so every route inherits it. The segment
+   * layout at /hyperliquid overrides only title and description, and metadata
+   * merges rather than replaces, so these icons apply there too.
+   *
+   * The SVG is listed first for browsers that take it: it stays sharp at any
+   * size. The .ico carries 16, 32 and 48px rasters for those that do not.
+   */
+  icons: {
+    icon: [
+      { url: "/brand/icon.svg", type: "image/svg+xml" },
+      { url: "/brand/favicon.ico", sizes: "16x16 32x32 48x48" },
+    ],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 const fontVars = `${ubuntu.variable} ${roboto.variable} ${inter.variable} ${jetbrainsMono.variable}`;

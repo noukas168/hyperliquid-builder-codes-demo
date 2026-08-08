@@ -2,6 +2,7 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useSwitchChain } from "wagmi";
+import BasisMark from "@/components/BasisMark";
 import SwapCard from "@/components/SwapCard";
 import { BNB_CHAIN } from "@/config/chains";
 
@@ -29,9 +30,15 @@ export default function BasisPage() {
       <header className="border-bs-n4 border-b bg-bs-n0">
         <div className="w-full px-4 pt-3 pb-2.5 sm:px-5">
           <div className="flex items-center justify-between gap-4">
+            {/* Logo lockup. The mark is one of the three permitted uses of
+                brand red, alongside the rule above and the primary action; it
+                takes the colour through currentColor rather than a fill, so it
+                cannot drift from the token. The wordmark stays in the
+                interface face and in a neutral, because a wordmark is
+                identity, not signal. */}
             <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className="h-3 w-3 shrink-0 rounded-[2px] bg-bs-brand" />
-              <h1 className="truncate font-semibold text-bs-md text-bs-n9">Basis</h1>
+              <BasisMark className="h-5 w-5 shrink-0 text-bs-brand" />
+              <h1 className="truncate font-semibold text-bs-md text-bs-n9 tracking-tight">Basis</h1>
             </div>
             <ConnectButton showBalance={false} accountStatus="address" chainStatus="icon" />
           </div>

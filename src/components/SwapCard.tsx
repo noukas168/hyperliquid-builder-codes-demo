@@ -450,7 +450,7 @@ export default function SwapCard() {
             onChange={(e) => {
               if (/^[0-9]*\.?[0-9]*$/.test(e.target.value)) setAmount(e.target.value);
             }}
-            className="bs-num min-w-0 flex-1 bg-transparent text-bs-n9 text-bs-num outline-none placeholder:text-bs-n6"
+            className="bs-num min-w-0 flex-1 bg-transparent text-bs-n9 text-bs-num-xl outline-none placeholder:text-bs-n6"
           />
           <button
             type="button"
@@ -497,7 +497,7 @@ export default function SwapCard() {
           <span className={LABEL}>You receive (estimated)</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="bs-num min-w-0 flex-1 truncate text-bs-n9 text-bs-num">
+          <span className="bs-num min-w-0 flex-1 truncate text-bs-n9 text-bs-num-xl">
             {isLoading ? "…" : fmt(buyAmount, buyToken.decimals)}
           </span>
           {tokenButton("buy", buyToken)}

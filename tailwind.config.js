@@ -37,8 +37,14 @@ module.exports = {
         "bs-base": ["13px", { lineHeight: "20px" }],
         "bs-md": ["15px", { lineHeight: "22px" }],
         "bs-lg": ["17px", { lineHeight: "24px", letterSpacing: "-0.01em" }],
-        // The two amount fields, the largest figures on the page.
+        /**
+         * Display steps, for figures only. The amounts being traded are the
+         * subject of the card, so they sit two steps above everything else on
+         * it and are unambiguously the largest text there.
+         */
         "bs-num": ["26px", { lineHeight: "32px", letterSpacing: "-0.02em" }],
+        "bs-num-lg": ["31px", { lineHeight: "38px", letterSpacing: "-0.02em" }],
+        "bs-num-xl": ["36px", { lineHeight: "44px", letterSpacing: "-0.025em" }],
       },
       colors: {
         bs: {
