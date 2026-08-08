@@ -177,10 +177,12 @@ redefining those restyles `/hyperliquid` as a side effect.
 
 **Every colour means exactly one thing.**
 
-- **Brand** `#E23A2E` is the identity layer only: the mark, the primary action,
+- **Brand** `#D6362B` is the identity layer only: the mark, the primary action,
   the rule across the top of the page. It never touches a price, a balance, an
   address or a status. A brand colour carrying data makes the loudest signal in
-  the interface meaningless.
+  the interface meaningless. White on it measures 4.75:1, which clears AA for
+  the primary action's label; the `#E23A2E` it replaced measured 4.31:1 and did
+  not.
 - **Success** `#2FBF71` is a positive verdict, and nothing else. It is not a
   confirmation colour for wallet chrome.
 - **Alarm** `#FF2D55` is a negative verdict. It is a hotter, pinker red than the

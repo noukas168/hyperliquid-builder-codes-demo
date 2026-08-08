@@ -171,7 +171,9 @@ samp {
 
      Uncertainty has no colour at all: an unknown or could-not-check state
      uses --bs-n7, because colouring it would present it as a verdict. */
-  --bs-brand: #e23a2e;
+  /* White on this measures 4.75:1, clearing the 4.5:1 AA needs for the
+     primary action's label. The brick it replaced measured 4.31:1. */
+  --bs-brand: #d6362b;
   --bs-success: #2fbf71;
   --bs-alarm: #ff2d55;
   --bs-warn: #f0a21a;
